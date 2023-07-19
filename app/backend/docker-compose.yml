@@ -3,11 +3,11 @@ services:
   mysql:
     restart: always
     container_name: "mysql"
-    image: container-registry.oracle.com/mysql/community-server:latest
+    image: mysql:5.7
     ports:
       - 3306:3306
     environment:
-      - MYSQL_ROOT_PASSWORD=pw
+      - MYSQL_ROOT_PASSWORD=my-secret-pw
       - MYSQL_DATABASE=db
       - MYSQL_USER=user
-      - MYSQL_PASSWORD=pw
+      - MYSQL_PASSWORD=my-secret-pw

@@ -1,0 +1,22 @@
+from sqlalchemy import create_engine
+from sqlalchemy.orm import declarative_base, sessionmaker
+
+user = "root"
+pw = "my-secret-pw"
+host = "localhost"
+port = "3306"
+database = "db"
+
+CONN_STR = f"mysql+mysqlconnector://{user}:{pw}@{host}:{port}/{database}"
+
+engine = create_engine(CONN_STR)
+local_session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+Base = declarative_base()
+
+def get_db():
+    db = local_session()
+    try:
+        yield db
+    finally:
+        db.close()

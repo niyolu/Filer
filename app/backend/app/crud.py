@@ -27,7 +27,7 @@ def get_users(db: Session, skip: int = 0, limit: int = 100):
 def create_user(db: Session, user: schemas.UserCreate):
     hashed_password = auth.fake_hash_password(user.password)
     db_user = models.User(
-        email=user.username, hashed_password=hashed_password
+        username=user.username, hashed_password=hashed_password
     )
     db.add(db_user)
     db.commit()
@@ -57,7 +57,17 @@ def fake_decode_token(token):
     return schemas.User(
         username=token + "fakedecoded"
     )
-    
+
+
 async def get_current_user(token: Annotated[str, Depends(auth.oauth2_scheme)]):
     user = fake_decode_token(token)
     return user
+
+
+def deactivate_user_by_username(db: Session, username: str):
+    user = get_user_by_username(db, username)
+    user.is_active = False
+    db.commit()
+    db.refresh(user)
+    return user
+    

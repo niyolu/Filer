@@ -24,3 +24,20 @@ class Item(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
 
     owner = relationship("User", back_populates="items")
+    
+# class DBA(Base):
+#     __tablename__ = "DBA"
+#     i = Column(Integer, primary_key=True, index=True)
+#     n = Column(String(255), index=True)
+    
+# class A(BaseModel):
+#     i: int
+#     n: str
+#     class Config:
+#         from_attributes = True
+    
+# a = DBA(i=1, n="hi")
+# print(a)
+# b = A.model_validate(a)
+# print(b)
+# print(DBA(**b.model_dump()))

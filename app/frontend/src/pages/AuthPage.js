@@ -1,10 +1,12 @@
 // import React Hooks
 import React from 'react';
 import { json, redirect, useSearchParams } from 'react-router-dom';
+import queryString from "query-string";
 // import components
 //import { Modal, ModalBody, ModalHeader } from 'react-bootstrap';
 import { setAuthToken } from '../util/auth';
 import LoginForm from '../components/forms/LoginForm';
+import SignupForm from '../components/forms/SignupForm';
 //import SignupForm from '../components/forms/SignupForm';
 
 /**
@@ -29,7 +31,7 @@ const AuthPage = () => {
         </Modal>
     );*/
     return (
-        <LoginForm />
+        isLogin ? <LoginForm /> : <SignupForm />
     )
 };
 
@@ -39,10 +41,11 @@ export default AuthPage;
 export async function action({ request, params }) {
     // await form data...
     const data = await request.formData();
+    let loginData
 
     // create user object
     let user = {
-        email: data.get('email'),
+        username: data.get('username'),
         password: data.get('password')
     };
 
@@ -57,39 +60,79 @@ export async function action({ request, params }) {
     if (mode === 'signup') {
         user.username = data.get('username');
         user.passwordConfirm = data.get('confirmPassword');
+        let signUp = await signUp(user)
+        console.log(signUp)
     }
-/*
+
+    loginData = await logIn(user)
+    console.log(loginData.userData.access_token)
+
+    // login/signup successful
+    setAuthToken(
+        loginData.userData.access_token,
+        30
+    );
+    return redirect('/'); 
+}
+
+async function signUp(user) {
+    console.log(user)
     // send post request...
     const response = await fetch(
-        `${process.env.REACT_APP_ORIGIN_URL_BACKEND}/api/${mode}`,
+        `http://localhost:8000/users`,
         {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(user)
+            body: JSON.stringify({
+                "username": user.username,
+                "password": user.password
+            })
         }
     );
 
-    // // handle errors
-    if (response.status === 422 || response.status === 401) {
-        return response;
+    // handle response
+    if (response.status !== 200) {
+        // redirect to error page
+        return json({ message: 'Could not fetch userData...' }, { status: response.status });
+    } else {
+        // return learnunits
+        const userData = await response.json();
+        return {
+            userData: userData,
+        };
     }
-    if (!response.ok) {
-        throw json({ message: 'could not authenticate user' }, { status: 500 });
-    }
+}
 
-    // parse data
-    const resData = await response.json();
-    // no admin rights for user
-    if (!resData.data.user.isAdmin) {
-        throw json({ message: 'not autherized to use application, please contact support' }, { status: 403 });
-    }*/
-    
-    // login/signup successful
-    setAuthToken(
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY0YjRlZGIzYjEzNThjZTQzMDQ1MGZlMiIsImlhdCI6MTY5MDEzMDQzMywiZXhwIjoxNjkwMTMyMjMzfQ.I7u50FlDpfIh4kfcp1x0cSJZx8Mu-ZERppOvhdt4Nz8", 
-        30
+async function logIn(user) {
+    console.log(user)
+    // send post request...
+    const response = await fetch(
+        `http://localhost:8000/token`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: queryString.stringify({
+                "username": user.username,
+                "password": user.password
+            })
+        }
     );
-    return redirect('/');
+
+    // handle response
+    if (response.status !== 200) {
+        // redirect to error page
+        return json({ message: 'Could not fetch userData...' }, { status: response.status });
+    } else {
+        // return learnunits
+        const promise = await response.json();
+
+
+        return {
+            userData: promise,
+        };
+    }
 }

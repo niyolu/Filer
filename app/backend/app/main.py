@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
 
 from sqlalchemy.orm import Session
 
@@ -14,6 +15,20 @@ from .database import engine
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+origins = [
+    # Add your frontend domain(s) here to restrict CORS to specific domains
+    "http://localhost:3000",  # Example: Replace with your frontend URL
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 LocalSession = Annotated[Session, Depends(database.get_db)]
 

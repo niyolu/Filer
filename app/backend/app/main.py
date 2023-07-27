@@ -17,8 +17,8 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 origins = [
-    "http://localhost:8000",
-    "https://localhost:8000"
+    # Add your frontend domain(s) here to restrict CORS to specific domains
+    "http://localhost:3000",  # Example: Replace with your frontend URL
 ]
 
 app.add_middleware(

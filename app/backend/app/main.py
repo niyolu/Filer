@@ -10,7 +10,6 @@ from jose import JWTError
 from . import crud, models, schemas, auth, database
 from .database import engine
 
-#import warnings
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -32,11 +31,12 @@ async def get_current_user(
         token_data: schemas.TokenData | None = auth.decode_token(token)
         if token_data is None:
             raise credentials_exception
-    except JWTError as e:
+    except JWTError:
         raise credentials_exception
     user = crud.get_user_by_username(db, token_data.username)
     if not user:
         raise credentials_exception
+    
     return schemas.User.model_validate(user)
 
 
@@ -63,7 +63,7 @@ async def login(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token = auth.create_access_token(data={"sub": user.username})
+    access_token = auth.create_access_token(data={"sub": user.username}) # should be in auth api not here
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -98,7 +98,7 @@ def activate_user(
     current_user: CurrentUser,
     db: LocalSession
 ):
-    if current_user.username != "admin":
+    if not auth.is_admin(current_user.username):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid action",
@@ -107,7 +107,7 @@ def activate_user(
     return crud.deactivate_user_by_username(db, current_user.username)
 
 
-@app.post("/")
+@app.get("/")
 def root():
     return "running"
 
@@ -146,7 +146,6 @@ def read_own_files(
 # def read_items(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 #     items = crud.get_items(db, skip=skip, limit=limit)
 #     return items
-
 
 
 # @app.get("/items/")

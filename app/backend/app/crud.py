@@ -53,21 +53,9 @@ def create_user_item(db: Session, item: schemas.ItemCreate, user_id: int):
     return db_item
 
 
-def fake_decode_token(token):
-    return schemas.User(
-        username=token + "fakedecoded"
-    )
-
-
-async def get_current_user(token: Annotated[str, Depends(auth.oauth2_scheme)]):
-    user = fake_decode_token(token)
-    return user
-
-
 def deactivate_user_by_username(db: Session, username: str):
     user: models.User = get_user_by_username(db, username)
     user.is_active = False
     db.commit()
     db.refresh(user)
     return user
-    

@@ -5,6 +5,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from sqlalchemy.orm import Session
 
+from jose import JWTError
+
 from . import crud, models, schemas, auth, database
 from .database import engine
 
@@ -17,15 +19,24 @@ app = FastAPI()
 LocalSession = Annotated[Session, Depends(database.get_db)]
 
 
-async def get_current_user(token: Annotated[str, Depends(auth.oauth2_scheme)], db: LocalSession):  
-    username = auth.fake_decode_token(token)
-    user = crud.get_user_by_username(db, username)
+async def get_current_user(
+    token: Annotated[str, Depends(auth.oauth2_scheme)],
+    db: LocalSession
+):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        token_data: schemas.TokenData | None = auth.decode_token(token)
+        if token_data is None:
+            raise credentials_exception
+    except JWTError as e:
+        raise credentials_exception
+    user = crud.get_user_by_username(db, token_data.username)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise credentials_exception
     return schemas.User.model_validate(user)
 
 
@@ -40,32 +51,30 @@ async def get_current_active_user(
 CurrentUser = Annotated[schemas.User, Depends(get_current_active_user)]
 
 
-@app.post("/token")
-async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db: LocalSession):
-    user: models.User = crud.get_user_by_username(db, form_data.username)
+@app.post("/token", response_model=schemas.Token)
+async def login(
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    db: LocalSession
+):
+    user: schemas.User = auth.authenticate_user(db, form_data.username, form_data.password)
     if not user:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-    hashed_password = auth.fake_hash_password(form_data.password)
-    if not hashed_password == user.hashed_password:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-
-    return {"access_token": user.username, "token_type": "bearer"}
-
-
-# @app.get("/items/")
-# async def read_items(token: Annotated[str, Depends(auth.oauth2_scheme)]):
-#     print(token)
-#     return {"token": token}
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token = auth.create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
-@app.get("/users/me")
+@app.get("/users/me", response_model=schemas.User)
 async def read_users_me(
     current_user: CurrentUser
 ):
     return current_user
 
 
-@app.post("/users/", response_model=schemas.User)
+@app.post("/users", response_model=schemas.User)
 def create_user(
     user: schemas.UserCreate,
     db: LocalSession
@@ -102,6 +111,16 @@ def activate_user(
 def root():
     return "running"
 
+
+@app.get("/storage/all")
+def read_own_files(
+    current_user: CurrentUser,
+    db: LocalSession
+):
+    user: models.User = crud.get_user_by_username(db, current_user.username)
+    root_dir = {"id": "/root", "children": ["foo.txt", "bar.txt"], "owner": user.username} # user.files or something
+    return root_dir
+
 # @app.get("/users/", response_model=List[schemas.User])
 # def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 #     users = crud.get_users(db, skip=skip, limit=limit)
@@ -127,3 +146,10 @@ def root():
 # def read_items(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
 #     items = crud.get_items(db, skip=skip, limit=limit)
 #     return items
+
+
+
+# @app.get("/items/")
+# async def read_items(token: Annotated[str, Depends(auth.oauth2_scheme)]):
+#     print(token)
+#     return {"token": token}

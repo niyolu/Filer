@@ -26,7 +26,6 @@ def authenticate_user(db, username: str, password: str):
     user: models.User = crud.get_user_by_username(db, username)
     if not user:
         return False
-    print(password, user.hashed_password)
     if not verify_password(password, user.hashed_password):
         return False
     return schemas.User.model_validate(user)
@@ -47,3 +46,7 @@ def decode_token(token: str):
     username: str = payload.get("sub")
     if username is not None:
         return schemas.TokenData(username=username)
+    
+    
+def is_admin(username: str):
+    return username == "admin"

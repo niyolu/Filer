@@ -1,2 +1,7 @@
-fastapi==0.100.0
-SQLAlchemy==2.0.19
+fastapi
+mysql-connector-python
+sqlalchemy
+uvicorn
+python-multipart
+python-jose
+pydantic-settings

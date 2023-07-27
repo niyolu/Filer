@@ -1,0 +1,138 @@
+from collections import Counter
+
+def file_type_from_extension(filename: str) -> str | None:
+    associations = {
+        "audio": {
+            "aif": "AIF audio file",
+            "cda": "CD audio track file",
+            "mid": "MIDI audio file.",
+            "midi": "MIDI audio file.",
+            "mp3": "MP3 audio file",
+            "mpa": "MPEG-2 audio file",
+            "ogg": "Ogg Vorbis audio file",
+            "wav": "WAV file",
+            "wma": "WMA audio file",
+            "wpl": "Windows Media Player playlist",
+        },
+        "compressed": {
+            "7z": "7-Zip compressed file",
+            "arj": "ARJ compressed file",
+            "deb": "Debian software package file",
+            "pkg": "Package file",
+            "rar": "RAR file",
+            "rpm": "Red Hat Package Manager",
+            "tar": "z - Tarball compressed file",
+            "z": "Z compressed file",
+            "zip": "Zip compressed file",
+        },
+        "disc image": {
+            "dmg": "macOS X disk image",
+            "iso": "ISO disc image",
+            "toast": "Toast disc image",
+            "vcd": "Virtual CD",
+        },
+        "data": {
+            "csv": "Comma separated value file",
+            "dat": "Data file",
+            "log": "Log file",
+            "sav": "Save file (e.g., game save file)",
+            "xml": "XML file",
+        },
+        "database": {
+            "db": ".dbf - Database file",
+            "mdb": "Microsoft Access database file",
+            "sql": "SQL database file",
+        },
+        "email": {
+            "email": "Outlook Express e-mail message file.",
+            "eml": "E-mail message file from multiple e-mail clients, including Gmail.",
+            "emlx": "Apple Mail e-mail file.",
+            "msg": "Microsoft Outlook e-mail message file.",
+            "oft": "Microsoft Outlook e-mail template file.",
+            "ost": "Microsoft Outlook offline e-mail storage file.",
+            "pst": "Microsoft Outlook e-mail storage file.",
+            "vcf": "E-mail contact file.",
+            
+        },
+        "executable": {  
+            "apk": "Android package file",
+            "bat": "Batch file",
+            "bin": "Binary file",
+            "cgi": "Perl script file",
+            "pl": "Perl script file",
+            "com": "MS-DOS command file",
+            "exe": "Executable file",
+            "gadget": "Windows gadget",
+            "jar": "Java Archive file",
+            "msi": "Windows installer package",
+            "wsf": "Windows Script File",
+        },
+        "image": {
+            "ai": "Adobe Illustrator file",
+            "bmp": "Bitmap image",
+            "gif": "GIF image",
+            "ico": "Icon file",
+            "jpeg": ".jpg - JPEG image",
+            "png": "PNG image",
+            "ps": "PostScript file",
+            "psd": "PSD image",
+            "svg": "Scalable Vector Graphics file",
+            "tif": ".tiff - TIFF image",
+            "webp": "WebP image.",
+        },
+        "source code": {
+            "css": "Cascading Style Sheet file",
+            "htm": ".html - HTML file",
+            "js": "JavaScript file",
+            "c": "C and C++ source code file",
+            "cpp": "C++ source code file",
+            "cs": "Visual C# source code file",
+            "h": "C, C++, and Objective-C header file",
+            "java": "Java Source code file",
+            "php": "PHP script file.",
+            "py": "Python script file.",
+            "sh": "Bash shell script",
+            "swift": "Swift source code file",
+            "vb": "Visual Basic file",
+            "rs": "Rust file",
+        },
+        "spreadsheet format": {
+            "ods": "OpenOffice Calc spreadsheet file",
+            "xls": "Microsoft Excel file",
+            "xlsm": "Microsoft Excel file with macros",
+            "xlsx": "Microsoft Excel Open XML spreadsheet file",
+        },
+        "video": {
+            "3g2": "3GPP2 multimedia file",
+            "3gp": "3GPP multimedia file",
+            "avi": "AVI file",
+            "flv": "Adobe Flash file",
+            "h264": "H.264 video file",
+            "m4v": "Apple MP4 video file",
+            "mkv": "Matroska Multimedia Container",
+            "mov": "Apple QuickTime movie file",
+            "mp4": "MPEG4 video file",
+            "mpg": ".mpeg - MPEG video file",
+            "rm": "RealMedia file",
+            "swf": "Shockwave flash file",
+            "vob": "DVD Video Object",
+            "webm": "WebM video file.",
+            "wmv": "Windows Media Video file",
+        },
+        "text": {
+            "doc": ".docx - Microsoft Word file",
+            "odt": "OpenOffice Writer document file",
+            "pdf": "PDF file",
+            "rtf": "Rich Text Format",
+            "tex": "A LaTeX document file",
+            "txt": "Plain text file",
+            "wpd": "WordPerfect document",
+        }
+    }
+    extension = filename.split(".")[-1]
+    for category, extension_mapping in associations.items():
+        if extension in extension_mapping:
+            return f"{category} ({extension_mapping[extension]})"
+        
+        
+print(file_type_from_extension("hi.wat"))

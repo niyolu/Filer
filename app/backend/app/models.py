@@ -1,8 +1,20 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
+from sqlalchemy import Table, Boolean, Column, ForeignKey, Integer, String, BigInteger, LargeBinary
 from sqlalchemy.orm import relationship
 
-from .database import Base
+from database import Base
 
+import config
+
+
+settings: config.Settings = config.get_settings()
+
+
+user_group_table = Table(
+    "user_group_table",
+    Base.metadata,
+    Column("user_id", ForeignKey("users.id"), primary_key=True),
+    Column("group_id", ForeignKey("groups.id"), primary_key=True)
+)
 
 class User(Base):
     __tablename__ = "users"
@@ -11,19 +23,131 @@ class User(Base):
     username = Column(String(255), unique=True, index=True)
     hashed_password = Column(String(255))
     is_active = Column(Boolean, default=True)
+    
+    quota = Column(BigInteger, default=(settings.storage_quota_mb * 1024**2))
+    used = Column(BigInteger, default=0)
+    max_objects_per_dir = Column(Integer, default=settings.storage_max_objects_per_dir)
 
-    items = relationship("Item", back_populates="owner")
+    root_id = Column(Integer, ForeignKey("directories.id"))
+    root = relationship("Directory", foreign_keys=[root_id], post_update=True)
+    owned_objects = relationship("StorageObject", back_populates="owner", cascade="all, delete")
+    
+    group_memberships = relationship(
+        "Group",
+        secondary=user_group_table,
+        back_populates="members"
+    )
+    
+    shared_objects = relationship("StorageObject", secondary="storage_share", back_populates="shared_with_users")
+    
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.id}, {self. username} root={self.root.name if self.root else 'None'})"
 
 
-class Item(Base):
-    __tablename__ = "items"
-
+class StorageObject(Base):
+    __tablename__ = "storageobjects"
+    
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String(255), index=True)
-    description = Column(String(255), index=True)
+    name = Column(String(255))
+    path = Column(String(255))
+    
+    type = Column(String(255))
+    
     owner_id = Column(Integer, ForeignKey("users.id"))
+    owner = relationship("User", back_populates="owned_objects")
+    
+    # nullable parent_id since the root directory won't have a parent
+    parent_id = Column(Integer, ForeignKey("directories.id"), nullable=True)
+    parent = relationship(
+        "Directory",
+        back_populates="children",
+        primaryjoin="StorageObject.parent_id == Directory.id"
+    )
+    
+    shared_with_users = relationship("User", secondary="storage_share", back_populates="shared_objects")
+    
+    __mapper_args__ = {
+        "polymorphic_identity": "storageobjects",
+        "polymorphic_on": "type",
+    }
 
-    owner = relationship("User", back_populates="items")
+    
+class File(StorageObject):
+    __tablename__ = "files"
+    
+    id = Column(Integer, ForeignKey("storageobjects.id"), primary_key=True, index=True)
+    
+    filetype = Column(String(255))
+    content = Column(LargeBinary)
+    
+    __mapper_args__ = {
+        "polymorphic_identity": "files",
+        "polymorphic_on": "type",
+    }
+    
+    
+class Directory(StorageObject):
+    __tablename__ = "directories"
+    
+    id = Column(Integer, ForeignKey("storageobjects.id"), primary_key=True, index=True)
+    
+    children = relationship(
+        "StorageObject",
+        back_populates="parent",
+        primaryjoin="Directory.id == StorageObject.parent_id"
+    )
+    
+    __mapper_args__ = {
+        "polymorphic_identity": "directories",
+        "polymorphic_on": "type",
+        "inherit_condition": id == StorageObject.id
+    }
+
+
+class Group(Base):
+    __tablename__ = "groups"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(255))
+    
+    members = relationship(
+        "User",
+        secondary=user_group_table,
+        back_populates="group_memberships"
+    )
+    
+    shared_objects = relationship("StorageObject", secondary="group_share")
+
+
+class StorageShare(Base):
+    __tablename__ = "storage_share"
+    
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    obj_id = Column(Integer, ForeignKey("storageobjects.id"), primary_key=True)
+    
+    permission = Column(String(10), default="R")
+    
+    
+class GroupShare(Base):
+    __tablename__ = "group_share"
+    
+    group_id = Column(Integer, ForeignKey("groups.id"), primary_key=True)
+    obj_id = Column(Integer, ForeignKey("storageobjects.id"), primary_key=True)
+    
+    permission = Column(String(10), default="R")
+    
+
+    
+# class Item(Base):
+#     __tablename__ = "items"
+
+#     id = Column(Integer, primary_key=True, index=True)
+#     title = Column(String(255), index=True)
+#     description = Column(String(255), index=True)
+#     owner_id = Column(Integer, ForeignKey("users.id"))
+
+#     owner = relationship("User", back_populates="items")
+    
     
 # class DBA(Base):
 #     __tablename__ = "DBA"

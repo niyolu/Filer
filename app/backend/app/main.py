@@ -8,11 +8,10 @@ from sqlalchemy.orm import Session
 
 from jose import JWTError
 
-from . import crud, models, schemas, auth, database
-from .database import engine
+import crud, models, schemas, auth, database
 
 
-models.Base.metadata.create_all(bind=engine)
+models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()
 
@@ -30,6 +29,8 @@ app.add_middleware(
 )
 
 LocalSession = Annotated[Session, Depends(database.get_db)]
+
+crud.init_admin(next(database.get_db()))
 
 
 async def get_current_user(
@@ -62,7 +63,21 @@ async def get_current_active_user(
     return current_user
 
 
+    
+async def get_admin(
+    current_user: Annotated[schemas.User, Depends(get_current_user)]
+):
+    if not current_user.username == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid action",
+        )
+        
+    return current_user
+
+
 CurrentUser = Annotated[schemas.User, Depends(get_current_active_user)]
+Admin = Annotated[schemas.User, Depends(get_admin)]
 
 
 @app.post("/token", response_model=schemas.Token)
@@ -77,7 +92,7 @@ async def login(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token = auth.create_access_token(data={"sub": user.username}) # should be in auth api not here
+    access_token = auth.create_access_token(data={"sub": user.username}) # data should be in auth api not here
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -88,37 +103,41 @@ async def read_users_me(
     return current_user
 
 
+@app.get("/users", response_model=list[schemas.User])
+def read_users(
+    db: LocalSession
+):
+    return crud.get_users(db)
+
+
 @app.post("/users", response_model=schemas.User)
 def create_user(
     user: schemas.UserCreate,
     db: LocalSession
 ):
-    db_user = crud.get_user_by_username(db, username=user.username)
-    if db_user:
-        raise HTTPException(status_code=400, detail="User already registered")
-    return crud.create_user(db=db, user=user)
+    
+    hashed_password = auth.get_password_hash(user.password)
+    db_user = crud.create_user(db=db, username=user.username, hashed_password=hashed_password)
+    if not db_user:
+        raise HTTPException(status_code=400, detail="User already registered")    
+    return db_user
 
 
-@app.post("/users/deactivate/")
+@app.post("/users/deactivate/", response_model=schemas.User)
 def deactivate_user(
     current_user: CurrentUser,
     db: LocalSession
 ):
-    return crud.deactivate_user_by_username(db, current_user.username)
+    return crud.change_active_status_for_user_by_username(db, current_user.username, False)
 
 
-@app.post("/users/activate/")
+@app.post("/users/activate/", response_model=schemas.User)
 def activate_user(
-    current_user: CurrentUser,
+    admin: Admin,
+    username: str,
     db: LocalSession
-):
-    if not auth.is_admin(current_user.username):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid action",
-        )
-        
-    return crud.deactivate_user_by_username(db, current_user.username)
+):    
+    return crud.change_active_status_for_user_by_username(db, username, True)
 
 
 @app.get("/")
@@ -135,34 +154,11 @@ def read_own_files(
     root_dir = {"id": "/root", "children": ["foo.txt", "bar.txt"], "owner": user.username} # user.files or something
     return root_dir
 
-# @app.get("/users/", response_model=List[schemas.User])
-# def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-#     users = crud.get_users(db, skip=skip, limit=limit)
-#     return users
 
-
-# @app.get("/users/{user_id}", response_model=schemas.User)
-# def read_user(user_id: int, db: Session = Depends(get_db)):
-#     db_user = crud.get_user(db, user_id=user_id)
-#     if db_user is None:
-#         raise HTTPException(status_code=404, detail="User not found")
-#     return db_user
-
-
-# @app.post("/users/{user_id}/items/", response_model=schemas.Item)
-# def create_item_for_user(
-#     user_id: int, item: schemas.ItemCreate, db: Session = Depends(get_db)
+# @app.get("/storage/{path}", response_model=schemas.StorageObject)
+# def read_file(
+#     path: str,
+#     current_user: CurrentUser,
+#     db: LocalSession    
 # ):
-#     return crud.create_user_item(db=db, item=item, user_id=user_id)
-
-
-# @app.get("/items/", response_model=List[schemas.Item])
-# def read_items(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-#     items = crud.get_items(db, skip=skip, limit=limit)
-#     return items
-
-
-# @app.get("/items/")
-# async def read_items(token: Annotated[str, Depends(auth.oauth2_scheme)]):
-#     print(token)
-#     return {"token": token}
+#     return crud.get_storageobject_by_path(db, user_id=current_user.id, path=path)

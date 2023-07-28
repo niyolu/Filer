@@ -5,7 +5,7 @@ from fastapi.security import OAuth2PasswordBearer
 
 from jose import jwt
 
-from . import crud, models, config, schemas
+import crud, models, config, schemas
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -46,7 +46,3 @@ def decode_token(token: str):
     username: str = payload.get("sub")
     if username is not None:
         return schemas.TokenData(username=username)
-    
-    
-def is_admin(username: str):
-    return username == "admin"

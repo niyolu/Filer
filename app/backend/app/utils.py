@@ -1,6 +1,5 @@
-from collections import Counter
-
 def file_type_from_extension(filename: str) -> str | None:
+    "https://www.computerhope.com/issues/ch001789.htm"
     associations = {
         "audio": {
             "aif": "AIF audio file",
@@ -129,10 +128,9 @@ def file_type_from_extension(filename: str) -> str | None:
             "wpd": "WordPerfect document",
         }
     }
+    if not "." in filename:
+        return
     extension = filename.split(".")[-1]
     for category, extension_mapping in associations.items():
         if extension in extension_mapping:
             return f"{category} ({extension_mapping[extension]})"
-        
-        
-print(file_type_from_extension("hi.wat"))

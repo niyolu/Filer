@@ -1,6 +1,9 @@
 from sqlalchemy.orm import Session, joinedload
 
-import models, utils, auth
+import collections
+import itertools
+
+import models, utils, auth, schemas
 
 
 def flatten(list):
@@ -77,6 +80,18 @@ def get_shared_objs(db: Session, user_id: int):
     return get_user(db, user_id).shared_objects
 
 
+def rename_storageobject(db: Session, obj_id: int, new_name: str):
+    def _update_path(obj: models.StorageObject):
+        obj.path = f"{obj.parent.path}/{new_name}"
+        if isinstance(obj, models.StorageObject):
+            for child in obj.children:
+                _update_path(child)
+        
+    obj = get_storageobject_by_path(db, obj_id)
+    obj.name = new_name
+    _update_path(obj)
+
+
 def create_user(db: Session, username: str, hashed_password: str):
     if get_user_by_username(db, username) is not None:
         return
@@ -93,11 +108,13 @@ def create_storage_object(
     db: Session,
     user_id: int,
     path: str,
-    filename: str,
+    object_name: str,
     content: bytes | None = None
 ) -> models.StorageObject:
     if "/" not in path:
         raise ValueError("Invalid path.")
+    if "/" in object_name:
+        raise ValueError("invalid name")
     
     parent: models.Directory = get_storageobject_by_path(db, user_id, path)
     if not parent:
@@ -109,7 +126,7 @@ def create_storage_object(
     
     owner: models.User = get_user(db, user_id)
     
-    obj_path = f"{path}/{filename}"
+    obj_path = f"{path}/{object_name}"
 
     if len(parent.children) >= owner.max_objects_per_dir:
         raise PermissionError("Exceeds max objects per directory limit.")
@@ -119,23 +136,21 @@ def create_storage_object(
         if new_used > owner.quota:
             raise PermissionError("Exceeds user's storage quota.")
         owner.used = new_used
-        filetype = utils.file_type_from_extension(filename)
-        file = models.File(name=filename, owner=owner, content=content, parent=parent, filetype=filetype, path=obj_path)
+        filetype = utils.file_type_from_extension(object_name)
+        file = models.File(name=object_name, owner=owner, content=content, parent=parent, filetype=filetype, path=obj_path)
         db.add(file)
         db.commit()
         db.refresh(file)
         return file
     else:
-        directory = models.Directory(name=filename, owner=owner, parent=parent, path=obj_path)
+        directory = models.Directory(name=object_name, owner=owner, parent=parent, path=obj_path)
         db.add(directory)
         db.commit()
         db.refresh(directory)
         return directory
 
 
-def get_permission_for_user_and_object(db: Session, user_id: int, obj_id: int | None = None):
-    if obj_id is None:
-        return None
+def get_permission_for_user_and_object(db: Session, user_id: int, obj_id: int):
     user: models.User = get_user(db, user_id)
 
     def check_permission(obj):
@@ -179,12 +194,35 @@ def change_active_status_for_user_by_username(db: Session, username: str, state:
     return user
 
 
+
 def share_storage_object_with_user(db: Session, obj_id: int, from_user_id: int, to_user_id: int, permission: str):
+    """Share an existing storage object with another user
+
+    Args:
+        db (Session): db session
+        obj_id (int): id of object to be shared
+        from_user_id (int): owner of object
+        to_user_id (int): user to be shared with
+        permission (Permission):  Read or Read/Write permission
+
+    Raises:
+        PermissionError: insufficient permission to share the object
+
+    Returns:
+        StorageShare: ORM share representation
+        
+    Details:
+        if obj is directory dont share subobjects since we look it up to avoid having to update a lot
+        
+        if obj is shared already inside another directory, dont merge the shared reference so we can seperately
+        delete and display them to the client
+    """
+    
     obj = get_storageobject(db, obj_id)
     
     if obj.owner_id != from_user_id:
         raise PermissionError("You can only share objects owned by you.")
-
+    
     if not db.query(models.StorageShare).filter_by(user_id=to_user_id, obj_id=obj_id).first():
         share = models.StorageShare(user_id=to_user_id, obj_id=obj_id, permission=permission)
         db.add(share)
@@ -208,16 +246,30 @@ def share_storage_object_with_group(db: Session, obj_id: int, group_id, permissi
         return share
     
 
-def delete_object_by_path(db: Session, user_id: int, path: str):
-    object = get_storageobject_by_path(db, user_id, path)
-    if not object:
-        raise ValueError("Invalid path.")
-    if isinstance(object, models.File):
-        owner = object.owner
-        owner.used -= len(object.content)
-    db.delete(object)
+def delete_object(
+        db: Session,
+        obj: models.StorageObject,
+        deleted: list[models.StorageObject] | None = None
+    ):
+    if not deleted:
+        deleted = []
+    if isinstance(obj, models.File):
+        owner = obj.owner
+        owner.used -= len(obj.content)
+    else:
+        for child in obj.children:
+            deleted.append(delete_object(db, child))
+    db.delete(obj)
     db.commit()
-    return object
+    deleted.append(obj)
+    return deleted
+    
+
+def delete_object_by_path(db: Session, user_id: int, path: str):
+    obj= get_storageobject_by_path(db, user_id, path)
+    if not obj:
+        raise ValueError("Invalid path.")
+    return delete_object(db, obj)
 
 
 def delete_user(db: Session, user_id: int):
@@ -227,11 +279,24 @@ def delete_user(db: Session, user_id: int):
     return user
 
 
+# TODO: test
+def get_subelements(elements: list[models.StorageObject]):
+    working_set = collections.deque(elements)
+    subelements = []
+    while working_set:
+        element = working_set.popleft()
+        subelements.append(element)
+        match(element):
+            case models.Directory(children=children):
+                working_set.extend(children)
+    return subelements
+
+
 def get_all_objs(db: Session, user_id):
     user = get_user(db, user_id)
     owned_objs = user.owned_objects
-    shared_objs = user.shared_objects
-    group_shared_objs = {group.name: group.shared_objects for group in user.group_memberships}
+    shared_objs = get_subelements(user.shared_objects)
+    group_shared_objs = {group.name: get_subelements(group.shared_objects) for group in user.group_memberships}
     return owned_objs, shared_objs, group_shared_objs
     
     
@@ -250,6 +315,38 @@ def change_user_quota(db: Session, user_id: int, new_quota: int):
     user.quota = new_quota
     db.commit()
     return user
+
+
+def build_tree(root: models.Directory):
+    # seems this is equivalent to calling models.Directory.model_validate lmfao
+    tree = schemas.Directory.model_validate(root)
+    if not root.children:
+        return tree
+    
+    working_set = collections.deque()
+    
+    def _update(parent: schemas.Directory):
+        children: list[models.StorageObject] = parent.children
+        if not children:
+            return
+        files = [schemas.File.model_validate(c) for c in children if isinstance(c, models.File)]
+        directories = [c for c in children if isinstance(c, models.Directory)]
+        parent.children.extend(files)
+        if directories:
+            working_set.extend(itertools.product(directories, [parent]))
+    
+    _update(tree)
+    
+    current: models.Directory = None
+    parent: schemas.Directory = None
+    
+    while working_set:
+        current, parent = working_set.popleft()
+        new_node = schemas.Directory.model_validate(current)
+        parent.children.append(new_node)
+        _update(new_node)
+    
+    return tree
 
 
 def init_admin(db: Session):

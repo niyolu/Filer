@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import ForwardRef, Optional
 from pydantic import BaseModel
 from enum import Enum
@@ -38,26 +40,45 @@ class Permission(str, Enum):
 
 Directory_Ref = ForwardRef("Directory")
 
+class StorageObjectType(str, Enum):
+    R = "R"
+    RW = "RW"
+
 
 class StorageObject(BaseModel):
     name: str
     path: str
     type: str
     
-    owner: User
+    owner: User | None = None
     
-    parent: Optional[Directory_Ref]
+    #parent: Directory | None # Optional[Directory_Ref] # "Optional[Directory]" 
     
-    permission: Permission
+    permission: Permission | None = None
+    
+    class Config:
+        from_attributes = True
+        
+
+class StorageObjectDBID(StorageObject):
+    id: int
     
 
 class File(StorageObject):
-    filetype: str
+    filetype: str | None = None
     content: bytes
 
-   
+
+class FileDBID(StorageObject):
+    pass
+
+
+class DirectoryDBID(StorageObject):
+    pass
+
+
 class Directory(StorageObject):
-    children: list[StorageObject]
+    children: list[File | Directory]
 
 
 class StorageObjectCreate(BaseModel):

@@ -2,8 +2,8 @@ import sys
 sys.path.append("..")
 from sqlalchemy.orm import Session
 
-from app import crud, database, config, models
-from app.models import User, Directory, File, StorageObject
+import crud, database, config, models
+#from app.models import User, Directory, File, StorageObject
 
 import pytest
 
@@ -86,6 +86,19 @@ def test_create_storage_object(db_session):
     owned_obj = crud.create_storage_object(db_session, user.id, "/", "file.txt", content=b"Content")
     assert owned_obj.content == b"Content"
     assert owned_obj.path == "/file.txt"
+
+
+def test_create_storage_hierarchy(db_session):
+    user = create_test_user(db_session)
+    dir1 = crud.create_storage_object(db_session, user.id, "/", "dir1")
+    dir2 = crud.create_storage_object(db_session, user.id, "/dir1", "dir2")
+    dir3 = crud.create_storage_object(db_session, user.id, "/dir2", "dir3")
+    file1 = crud.create_storage_object(db_session, user.id, "/dir2", "file1")
+    file2 = crud.create_storage_object(db_session, user.id, "/dir3", "file1")
+    print(dir1)
+    assert False
+    assert owned_obj.content == b"Content"
+    assert owned_obj.path == "/file.txt"
     
     
 def test_share_storage_object_with_user(db_session):
@@ -137,7 +150,38 @@ def test_delete_object_by_path(db_session):
     user = create_test_user(db_session)
     file_obj = crud.create_storage_object(db_session, user.id, "/", "file.txt", content=b"File content")
     deleted_obj = crud.delete_object_by_path(db_session, user.id, "/file.txt")
-    assert deleted_obj.id == file_obj.id
+    assert deleted_obj[0].id == file_obj.id
+    
+def test_rename(db_session):
+    user = create_test_user(db_session)
+    dir1 = crud.create_storage_object(db_session, user.id, "/", "dir1")
+    file1 = crud.create_storage_object(db_session, user.id, "/dir1", "file1.txt", content=b"File content1")
+    dir2 = crud.create_storage_object(db_session, user.id, "/dir1", "dir2")
+    file2 = crud.create_storage_object(db_session, user.id, "/dir1/dir2", "file2.txt", content=b"File content2")    
+    
+
+def test_delete_subobject_by_path(db_session):
+    user = create_test_user(db_session)
+    file1 = crud.create_storage_object(db_session, user.id, "/", "file1.txt", content=b"File content1")
+    dir1 = crud.create_storage_object(db_session, user.id, "/", "dir1")
+    file2 = crud.create_storage_object(db_session, user.id, "/dir1", "file2.txt", content=b"File content2")
+    dir2 = crud.create_storage_object(db_session, user.id, "/dir1", "dir2")
+    file3 = crud.create_storage_object(db_session, user.id, "/dir1/dir2", "file3.txt", content=b"File content3")    
+    deleted_objs = crud.delete_object_by_path(db_session, user.id, "/dir1")
+    
+    print(dir2.path)
+    
+    assert_objs_deleted = [file2, dir2, file3]
+    
+    assert False, f"{deleted_objs=}{assert_objs_deleted=}"
+    for obj_to_delete in assert_objs_deleted:
+        assert obj_to_delete in deleted_objs, obj_to_delete.path
+    for obj_to_delete in assert_objs_deleted:
+        assert crud.get_storageobject(obj_to_delete.id) is None, obj_to_delete.path
+    assert crud.get_storageobject(file1.id) == file1
+    
+def test_delete_shared_obj(db_session):
+    pass
 
 def test_delete_user(db_session):
     user = create_test_user(db_session)

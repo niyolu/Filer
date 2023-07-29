@@ -1,7 +1,7 @@
 from sqlalchemy import Table, Boolean, Column, ForeignKey, Integer, String, BigInteger, LargeBinary
 from sqlalchemy.orm import relationship
 
-from database import Base
+from database import Base, SerializableBase
 
 import config
 
@@ -42,9 +42,12 @@ class User(Base):
     
     def __repr__(self):
         return f"{self.__class__.__name__}({self.id}, {self. username} root={self.root.name if self.root else 'None'})"
+    
+    def __str__(self):
+        return f"{repr(self):r} objects({self.owned_objects}=, {self.shared_objects}=) groups({self.group_memberships})"
 
 
-class StorageObject(Base):
+class StorageObject(SerializableBase):
     __tablename__ = "storageobjects"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -70,6 +73,13 @@ class StorageObject(Base):
         "polymorphic_identity": "storageobjects",
         "polymorphic_on": "type",
     }
+    
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.id=} {self.name=} {self.path=} owner={self.owner:r})"
+    
+    def __str__(self) -> str:
+        return f"{self:r} parent = {self.parent:r}"
+        
 
     
 class File(StorageObject):
@@ -85,6 +95,9 @@ class File(StorageObject):
         "polymorphic_on": "type",
     }
     
+    def __repr__(self) -> str:
+        return f"{super().__repr__().replace(super().__class__.__name__, self.__class__.__name__)} content({self.content}, {self.filetype=})"
+    
     
 class Directory(StorageObject):
     __tablename__ = "directories"
@@ -94,7 +107,7 @@ class Directory(StorageObject):
     children = relationship(
         "StorageObject",
         back_populates="parent",
-        primaryjoin="Directory.id == StorageObject.parent_id"
+        primaryjoin="Directory.id == StorageObject.parent_id",
     )
     
     __mapper_args__ = {
@@ -102,6 +115,12 @@ class Directory(StorageObject):
         "polymorphic_on": "type",
         "inherit_condition": id == StorageObject.id
     }
+    
+    def __repr__(self) -> str:
+        return super().__repr__.replace(super().__class__.__name__, self.__class__.__name__)
+    
+    def __str__(self) -> str:
+        return f"{self:r} children({','.join([repr(child) for child in self.children])})"
 
 
 class Group(Base):

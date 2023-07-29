@@ -13,7 +13,21 @@
 
 ##### Frontend
 
-1. install npm
+1. install [npm](https://www.npmjs.com/)
 2. navigate to `app/frontend`
 3. run `npm i`
 4. run `npm start`
+
+
+### Tests
+
+##### Crud
+1. navigate to `app/backend/tests`
+2. run `docker-compose up`
+3. run `pytest .\crudtest.py`
+
+
+### UML
+
+![Data Model](docs/model.png)
+

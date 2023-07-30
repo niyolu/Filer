@@ -180,7 +180,7 @@ export async function fileDirLoader() {
         method: 'get',
         headers: {
             accept: "application / json",
-            Authorization: "Bearer " + token 
+            Authorization: "Bearer " + token
         }
     });
 
@@ -192,13 +192,39 @@ export async function fileDirLoader() {
         // return learnunits
         const userData = await response.json();
         console.log(userData)
+        const dirData = await dirLoader(token)
         return {
-            userData: userData
+            userData: userData,
+            dirData: dirData
         }
     }
     /*return {
         fileData: file
     }*/
+}
+
+async function dirLoader(token) {
+    const response = await fetch(`http://localhost:8000/storage`, {
+        method: 'get',
+        headers: {
+            accept: "application / json",
+            Authorization: "Bearer " + token
+        }
+    });
+
+    // handle response
+    if (response.status !== 200) {
+        // redirect to error page
+        return json({ message: 'Could not fetch data...' }, { status: response.status });
+    } else {
+        // return learnunits
+        const userData = await response.json();
+        console.log(userData)
+
+        return {
+            userData: userData
+        }
+    }
 }
 
 export function fileLoader() {

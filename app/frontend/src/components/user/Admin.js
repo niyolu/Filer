@@ -52,7 +52,7 @@ export default function Admin({userData, groupData, allGroupData, allUserData}) 
     async function handleCommit() {
         let token = getAuthToken()
         await fetch(
-            `http://localhost:8000/groups/join?group_name=${selectedGroup}&user_name=${selectedUser.username}`,
+            `http://localhost:8000/groups/join?group_name=${selectedGroup}&user_name=${selectedUser}`,
             {
                 method: 'PATCH',
                 headers: {

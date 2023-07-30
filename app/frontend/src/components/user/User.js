@@ -1,71 +1,43 @@
 import React, { useState } from 'react';
-export default function User({userData, groupData}) {
-    const [users, setUsers] = useState(userData);
+import { getAuthToken } from '../../util/auth';
+export default function User({ userData, groupData, allGroupData }) {
+    console.log(allGroupData)
+    const [user, setUser] = useState(userData);
 
     const [groups, setGroups] = useState(groupData);
     const [selectedUser, setSelectedUser] = useState(1);
 
-    const addUserToGroup = (userId, groupName) => {
-        setUsers((prevUsers) => {
-            const updatedUsers = prevUsers.map((user) => {
-                if (user.id === userId) {
-                    return { ...user, groups: [...user.groups, groupName] };
-                }
-                return user;
-            });
-            return updatedUsers;
-        });
-    }; 
-    const removeUserToGroup = (userId, groupName) => {
-        setUsers((prevUsers) => {
-            const updatedUsers = prevUsers.map((user) => {
-                if (user.id === userId) {
-                    console.log(user.groups)
-                    let newGroups = user.groups.map((group) => {
-                        if(group !== groupName) {
-                            return group;
-                        }
-                    })
-                    return { ...user, groups: [newGroups] };
-                }
-                return user;
-            });
-            return updatedUsers;
-        });
-    };
-
-    let selectUser = (userId) => {
-        setSelectedUser(userId)
-    }
-    //console.log(users.find((user) => user.id === selectedUser).id)
+    
+    
     return (
         <div>
-            <ul>
-                {users.map((user) => (
-                    <li key={user.id} onClick={() => selectUser(user.id)}>
-                        <strong>{user.name}</strong> ({user.email})
-                        <ul>
-                            {user.groups.map((group) => (
-                                <li key={group}>{group}</li>
-                            ))}
-                        </ul>
-                    </li>
-                ))}
-            </ul>
-            <h3>Groups</h3>
-            <ul>
-                {groups.map((group) => (
-                    <li key={group}>
-                        {group}
-                        <button onClick={() => addUserToGroup(users.find((user) => user.id === selectedUser).id, group)}>
-                            Add {users.find((user) => user.id === selectedUser).name}
-                        </button>
-                        <button onClick={() => removeUserToGroup(users.find((user) => user.id === selectedUser).id, group)}>
-                            Add {users.find((user) => user.id === selectedUser).name}
-                        </button>
-                    </li>
-                ))}
-            </ul>
+            <div>
+                <h4>User Info</h4>
+                <table>
+                    <tbody>
+                        <tr>
+                            <th>
+                                Username:
+                            </th>
+                            <td>
+                                {userData.username}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>
+                                Storage Used:
+                            </th>
+                            <td>
+                                {userData.used} / {userData.quota} Byte
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div>
+                <h4>Active Groups</h4>
+                {groupData.length <= 0 ? (<div></div>) : (<div>You are not part of any groups</div>)}
+            </div>
         </div>
     );
 };

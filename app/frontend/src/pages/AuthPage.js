@@ -21,6 +21,7 @@ const AuthPage = () => {
     const [searchParams] = useSearchParams();
     const isLogin = searchParams.get('mode') === 'login';
 
+
     // renders a login/signup form
     /*return (
         <Modal show={true} className="auth-form m-0 p-0">
@@ -43,6 +44,7 @@ export async function action({ request, params }) {
     const data = await request.formData();
     let loginData
 
+
     // create user object
     let user = {
         username: data.get('username'),
@@ -52,16 +54,16 @@ export async function action({ request, params }) {
     // check and set mode
     const searchParams = new URL(request.url).searchParams;
     let mode = searchParams.get('mode');
+    console.log(mode)
     if (mode !== 'signup' && mode !== 'login') {
         mode = 'signup';
     }
 
     // add extra fields, if mode is 'signup'
     if (mode === 'signup') {
-        user.username = data.get('username');
-        user.passwordConfirm = data.get('confirmPassword');
-        let signUp = await signUp(user)
-        console.log(signUp)
+        user.email = data.get('email');
+        let signUpData = await signUp(user)
+        console.log(signUpData)
     }
 
     loginData = await logIn(user)
@@ -72,7 +74,7 @@ export async function action({ request, params }) {
         loginData.userData.access_token,
         30
     );
-    return redirect('/'); 
+    return redirect('/');
 }
 
 async function signUp(user) {
@@ -87,7 +89,10 @@ async function signUp(user) {
             },
             body: JSON.stringify({
                 "username": user.username,
-                "password": user.password
+                "password": user.password,
+                "is_active": true,
+                "quota": 0,
+                "used": 0
             })
         }
     );

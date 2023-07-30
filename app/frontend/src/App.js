@@ -7,10 +7,11 @@ import AuthPage, { action as authAction } from './pages/AuthPage';
 import { action as logoutAction } from './pages/Logout';
 
 import { tokenLoader, checkAuthLoader } from './util/auth';
-import { fileLoader, homeLoader, userLoader } from './util/loader';
+import { fileDirLoader, fileLoader, homeLoader, userLoader } from './util/loader';
 import HomePage from './pages/HomePage';
 import UserPage from './pages/UserPage';
 import FilePage from './pages/FilePage';
+import FileContentPage from './pages/FileContentPage';
 
 
 const router = createBrowserRouter([
@@ -62,6 +63,12 @@ const router = createBrowserRouter([
                 index: true,
                 id: 'filemanagement',
                 element: <FilePage />,
+                loader: fileDirLoader
+              },
+              {
+                path: ':id',
+                id: 'file',
+                element: <FileContentPage />,
                 loader: fileLoader
               }
             ]

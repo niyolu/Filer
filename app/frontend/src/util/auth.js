@@ -37,10 +37,15 @@ export function getTokenDuration() {
     if (expirationDate === null) {
         return null;
     }
+    if (expirationDate === 'EXPIRED') {
+        removeAuthToken()
+    }
     const tokenExpiration = new Date(expirationDate);
     // check for current remaining time
     const now = new Date();
     const duration = tokenExpiration.getTime() - now.getTime();
+
+    console.log(duration)
 
     return duration;
 }

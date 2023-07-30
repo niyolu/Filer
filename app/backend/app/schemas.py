@@ -58,33 +58,23 @@ class StorageObjectBase(BaseModel):
 class StorageObject(StorageObjectBase):
     owner: User | None = None
     permission: Permission | None = None
-    type: str
     #parent: Directory | None # Optional[Directory_Ref] # "Optional[Directory]" 
 
 
 class FileSummary(StorageObjectBase):
-    filetype: str
-    
-    
+    filetype: str | None = None
+
+
 class DirectorySummary(StorageObjectBase):
     pass
 
-
-class StorageObjectDBID(StorageObject):
-    id: int
+class DirectorySummaryChildren(DirectorySummary):
+    children: list[FileSummary | DirectorySummaryChildren]
     
 
 class File(StorageObject):
     filetype: str | None = None
-    content: bytes
-
-
-class FileDBID(StorageObject):
-    pass
-
-
-class DirectoryDBID(StorageObject):
-    pass
+    #content: bytes
 
 
 class Directory(StorageObject):
@@ -92,16 +82,21 @@ class Directory(StorageObject):
 
 
 class StorageObjectCreate(BaseModel):
-    destination: str
-    owner: User
+    path: str
     name: str
 
 
 class FileCreate(StorageObjectCreate):
     content: bytes
 
+    
+class FileOverview(BaseModel):
+    owned_files: DirectorySummaryChildren
+    shared_objects: list[Directory | File]
+    group_shared_objects: dict[str, list[Directory | File]]
 
-class DirectoryCreate(BaseModel):
+
+class DirectoryCreate(StorageObjectCreate):
     pass
 
 

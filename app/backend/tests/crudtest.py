@@ -1,5 +1,3 @@
-import sys
-sys.path.append("..")
 from sqlalchemy.orm import Session
 
 import crud, database, config, models
@@ -92,11 +90,13 @@ def test_create_storage_hierarchy(db_session):
     user = create_test_user(db_session)
     dir1 = crud.create_storage_object(db_session, user.id, "/", "dir1")
     dir2 = crud.create_storage_object(db_session, user.id, "/dir1", "dir2")
-    dir3 = crud.create_storage_object(db_session, user.id, "/dir2", "dir3")
-    file1 = crud.create_storage_object(db_session, user.id, "/dir2", "file1")
-    file2 = crud.create_storage_object(db_session, user.id, "/dir3", "file1")
+    dir3 = crud.create_storage_object(db_session, user.id, "/dir1/dir2", "dir3")
+    file1 = crud.create_storage_object(db_session, user.id, "/dir1/dir2", "file1", content=b"1")
+    file2 = crud.create_storage_object(db_session, user.id, dir3.path, "file2", content=b"2")
+    
     print(dir1)
     assert False
+    assert file2.path == "/dir1/dir2/dir3/file2"
     assert owned_obj.content == b"Content"
     assert owned_obj.path == "/file.txt"
     
@@ -187,3 +187,7 @@ def test_delete_user(db_session):
     user = create_test_user(db_session)
     deleted_user = crud.delete_user(db_session, user.id)
     assert deleted_user.id == user.id
+    
+if __name__ == "__main__":
+    assert False
+    test_create_storage_hierarchy(next(db_session()))

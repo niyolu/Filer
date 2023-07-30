@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, status, UploadFile
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -67,7 +67,7 @@ async def get_current_active_user(
 async def get_admin(
     current_user: Annotated[schemas.User, Depends(get_current_user)]
 ):
-    if not current_user.username == "admin":
+    if not current_user.username == "root":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid action",
@@ -123,7 +123,7 @@ def create_user(
     return db_user
 
 
-@app.post("/users/deactivate/", response_model=schemas.User)
+@app.post("/users/deactivate", response_model=schemas.User)
 def deactivate_user(
     current_user: CurrentUser,
     db: LocalSession
@@ -131,7 +131,7 @@ def deactivate_user(
     return crud.change_active_status_for_user_by_username(db, current_user.username, False)
 
 
-@app.post("/users/activate/", response_model=schemas.User)
+@app.post("/users/activate", response_model=schemas.User)
 def activate_user(
     admin: Admin,
     username: str,
@@ -145,14 +145,56 @@ def root():
     return "running"
 
 
+@app.get("/groups", response_model=list[schemas.Group])
+def read_users(
+    db: LocalSession
+):
+    return crud.get_groups(db)
+
+
+@app.get("/groups/me", response_model=list[schemas.Group])
+def read_users(
+    current_user: CurrentUser,
+    db: LocalSession
+):
+    return crud.get_group_by_username(current_user.username)
+
+
 @app.get("/storage/all")
 def read_own_files(
     current_user: CurrentUser,
     db: LocalSession
 ):
     user: models.User = crud.get_user_by_username(db, current_user.username)
-    root_dir = {"id": "/root", "children": ["foo.txt", "bar.txt"], "owner": user.username} # user.files or something
-    return root_dir
+    return crud.get_all_objs(db, user.id)
+
+
+@app.post("/storage/upload")
+async def upload_object(
+    current_user: CurrentUser,
+    db: LocalSession,
+    file: UploadFile | None = None
+):
+    user: models.User = crud.get_user_by_username(db, current_user.username)
+    
+    # TODO: check that this works
+    path, filename = file.filename.split(":") # [path:filename]
+    content = await file.read()
+    
+    return crud.create_storage_object(db, user.id, path, filename, content=content)
+
+
+@app.patch("/groups/join", response_model=schemas.Group)
+def join_group(
+    admin: Admin,
+    db: LocalSession,
+    group_name: str,
+    user_name: str
+):
+    group_id = crud.get_group_by_groupname(db, group_name).id
+    user_id = crud.get_user_by_username(db, user_name).id
+    return crud.add_user_to_group(db, group_id, user_id)
+    
 
 
 # @app.get("/storage/{path}", response_model=schemas.StorageObject)

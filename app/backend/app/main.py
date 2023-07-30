@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 
 from jose import JWTError
 
+import logging
+
 import crud, models, schemas, auth, database
 
 
@@ -31,6 +33,7 @@ app.add_middleware(
 
 @app.exception_handler(PermissionError)
 async def permission_exception_handler(request: Request, exc: PermissionError):
+    logging.warn(str(exc))
     return HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail=f"{exc}"
@@ -38,6 +41,7 @@ async def permission_exception_handler(request: Request, exc: PermissionError):
 
 @app.exception_handler(ValueError)
 async def valueerror_exception_handler(request: Request, exc: ValueError):
+    logging.warn(str(exc))
     return HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=f"{exc}"
@@ -45,6 +49,7 @@ async def valueerror_exception_handler(request: Request, exc: ValueError):
 
 @app.exception_handler(crud.DuplicateError)
 async def duplicate_exception_handler(request: Request, exc: crud.DuplicateError):
+    logging.warn(str(exc))
     return HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=f"{exc}"
@@ -52,7 +57,7 @@ async def duplicate_exception_handler(request: Request, exc: crud.DuplicateError
     
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    print(f"got general exception {type(exc)=}")
+    logging.warn(str(exc))
     return HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=f"{exc}"
@@ -81,6 +86,7 @@ async def get_current_user(
         if token_data is None:
             raise credentials_exception
     except JWTError:
+        logging.warn(credentials_exception)
         raise credentials_exception
     user = crud.get_user_by_username(db, token_data.username)
     if not user:
@@ -101,6 +107,7 @@ async def get_admin(
     current_user: Annotated[schemas.User, Depends(get_current_user)]
 ):
     if not current_user.username == "root":
+        logging.warn("Invalid action 401 UNAUTHORIZED")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid action",
@@ -120,6 +127,7 @@ async def login(
 ):
     user: schemas.User = auth.authenticate_user(db, form_data.username, form_data.password)
     if not user:
+        logging.warn("Incorrect username or password Invalid action 401 UNAUTHORIZED")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -151,7 +159,8 @@ def create_user(
     hashed_password = auth.get_password_hash(user.password)
     db_user = crud.create_user(db=db, username=user.username, hashed_password=hashed_password)
     if not db_user:
-        raise HTTPException(status_code=400, detail="User already registered")    
+        logging.warn("Incorrect username or password Invalid action 400 BAD REQUEST")
+        raise Exception("User already registered")
     return db_user
 
 
@@ -263,14 +272,7 @@ async def delete_object(
     path: str,
 ):
     user = crud.get_user_by_username(db, current_user.username)
-    try:
-        deleted = crud.delete_object_by_path(db, user.id, path)
-    except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Incorrect username or password"
-        )
-    return deleted
+    return crud.delete_object_by_path(db, user.id, path)
 
 
 @router_storage.post("/download", response_class=BytesResponse)
@@ -282,21 +284,11 @@ async def download_object(
     user: models.User = crud.get_user_by_username(db, current_user.username)
     file: models.StorageObject = crud.get_storageobject_by_path(db, user.id, path)
     if not isinstance(file, models.File):
+        logging.warn("resource is not a file")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="resource is not a file")
     
     return BytesResponse(content=file.content, filename=file.name)
 
-
-@router_groups.patch("/join", response_model=schemas.Group)
-def add_user_to_group(
-    current_user: CurrentUser,
-    db: LocalSession,
-    group_name: str,
-    user_name: str
-):
-    group_id = crud.get_group_by_groupname(db, group_name).id
-    user_id = crud.get_user_by_username(db, user_name).id
-    return crud.add_user_to_group(db, group_id, user_id)
 
 
 @router_groups.patch("/join", response_model=schemas.Group)
@@ -309,6 +301,17 @@ def add_user_to_group(
     group_id = crud.get_group_by_groupname(db, group_name).id
     user_id = crud.get_user_by_username(db, user_name).id
     return crud.add_user_to_group(db, group_id, user_id)
+
+# @router_groups.patch("/join", response_model=schemas.Group)
+# def add_user_to_group(
+#     current_user: CurrentUser,
+#     db: LocalSession,
+#     group_name: str,
+#     user_name: str
+# ):
+#     group_id = crud.get_group_by_groupname(db, group_name).id
+#     user_id = crud.get_user_by_username(db, user_name).id
+#     return crud.add_user_to_group(db, group_id, user_id)
 
 
 app.include_router(router_user)

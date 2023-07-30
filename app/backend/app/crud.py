@@ -105,7 +105,6 @@ def create_user(db: Session, username: str, hashed_password: str):
     db.add(user)
     db.commit()
     db.refresh(user)
-    print(user)
     return user
 
 

@@ -39,8 +39,12 @@ def get_groups(db: Session):
     return db.query(models.Group).all()
 
 
-def get_group_by_username(db: Session, groupname: str):
+def get_group_by_groupname(db: Session, groupname: str):
     return db.query(models.Group).filter(models.Group.name == groupname).first()
+
+
+def get_group_by_username(db: Session, username: str):
+    return get_user_by_username(db, username).group_memberships
 
 
 def get_user_groups(db: Session, user_id: int):
@@ -101,6 +105,7 @@ def create_user(db: Session, username: str, hashed_password: str):
     db.add(user)
     db.commit()
     db.refresh(user)
+    print(user)
     return user
 
 

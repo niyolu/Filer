@@ -45,7 +45,6 @@ class User(Base):
     
     def __str__(self):
         return f"{self!r} objects({self.owned_objects}=, {self.shared_objects}=) groups({self.group_memberships})"
-        #return f"{self:r} objects({self.owned_objects}=, {self.shared_objects}=) groups({self.group_memberships})"
 
 
 class StorageObject(SerializableBase):
@@ -76,7 +75,7 @@ class StorageObject(SerializableBase):
     }
     
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({self.id=} {self.name=} {self.path=} owner={self.owner:r})"
+        return f"{self.__class__.__name__}({self.id=} {self.name=} {self.path=} owner={self.owner!r})"
     
     def __str__(self) -> str:
         return f"{self!r} parent = {self.parent!r}"
@@ -118,7 +117,7 @@ class Directory(StorageObject):
     }
     
     def __repr__(self) -> str:
-        return super().__repr__.replace(super().__class__.__name__, self.__class__.__name__)
+        return super().__repr__().replace(super().__class__.__name__, self.__class__.__name__)
     
     def __str__(self) -> str:
         return f"{self!r} children({','.join([repr(child) for child in self.children])})"
@@ -128,7 +127,7 @@ class Group(Base):
     __tablename__ = "groups"
     
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255))
+    name = Column(String(255), unique=True)
     
     members = relationship(
         "User",
@@ -137,6 +136,12 @@ class Group(Base):
     )
     
     shared_objects = relationship("StorageObject", secondary="group_share")
+    
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.id=} {self.name=})"
+     
+    def __str__(self) -> str:
+        return f"{repr(self)} members({self.members}) shared_objects({self.shared_objects})" 
 
 
 class StorageShare(Base):

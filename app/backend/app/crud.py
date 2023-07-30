@@ -354,8 +354,8 @@ def get_all_objs_flat(db: Session, user_id: int):
     
 def get_all_objs_tree(db: Session, user_id: int):
     user: models.User = get_user(db, user_id)
-    owned_tree = schemas.DirectorySummaryChildren.model_validate(user.root)
     build = functools.partial(build_tree, user_id=user.id, db=db)
+    owned_tree = schemas.DirectorySummaryChildren.model_validate(user.root)
     shared_trees = [build(obj) for obj in user.shared_objects]
     group_shared_trees = {
         group.name: [build(obj) for obj in group.shared_objects]

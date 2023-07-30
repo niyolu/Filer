@@ -42,7 +42,7 @@ crud.init_admin(next(database.get_db()))
 
 
 router_user = APIRouter(prefix="/users", tags=["users"])
-router_storage = APIRouter(prefix="/storage", tags=["router"])
+router_storage = APIRouter(prefix="/storage", tags=["storage"])
 router_groups = APIRouter(prefix="/groups", tags=["groups"])
 
 async def get_current_user(
@@ -271,17 +271,6 @@ def join_group(
     return crud.add_user_to_group(db, group_id, user_id)
 
 
-
 app.include_router(router_user)
 app.include_router(router_storage)
 app.include_router(router_groups)
-
-    
-
-# @app.get("/storage/{path}", response_model=schemas.StorageObject)
-# def read_file(
-#     path: str,
-#     current_user: CurrentUser,
-#     db: LocalSession    
-# ):
-#     return crud.get_storageobject_by_path(db, user_id=current_user.id, path=path)

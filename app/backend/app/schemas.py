@@ -69,7 +69,7 @@ class DirectorySummary(StorageObjectBase):
     pass
 
 class DirectorySummaryChildren(DirectorySummary):
-    children: list[FileSummary | DirectorySummaryChildren]
+    children: list[DirectorySummaryChildren | FileSummary]
     
 
 class File(StorageObject):

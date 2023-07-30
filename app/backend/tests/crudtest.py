@@ -231,6 +231,10 @@ def test_get_all_objs_tree(db_session):
     midway_owned = midway_objs.owned_objects
     midway_shared = midway_objs.shared_objects
     midway_group_shared = midway_objs.group_shared_objects
+    print(midway_objs)
+    print("--\n")
+    print(midway_owned.children)
+    print(type(midway_owned.children))
     assert any([comp_obj_non_nested(owned_file1, c) for c in midway_owned.children]), midway_owned.children
     assert any([comp_obj_non_nested(owned_dir1, c) for c in midway_owned])
     assert any([comp_obj_non_nested(owned_file2, cc) for c in midway_owned for cc in c.children if isinstance(c, models.Directory)])

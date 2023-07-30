@@ -110,6 +110,7 @@ def create_user(
 ):
     if get_user_by_username(db, username) is not None:
         raise DuplicateError(f"User {username} already exists")
+    
     user = models.User(
         username=username, hashed_password=hashed_password,
         quota=quota, max_objects_per_dir=max_objects_per_dir
@@ -432,6 +433,10 @@ def build_tree(db: Session, user_id: int, root: models.Directory):
 
 
 def init_admin(db: Session):
-    create_user(
-        db, "root", auth.get_password_hash(auth.settings.app_admin_pw),
-        quota=1000, max_objects_per_dir=100)
+    try:
+        create_user(
+            db, "root", auth.get_password_hash(auth.settings.app_admin_pw),
+            quota=1000, max_objects_per_dir=100
+        )
+    except DuplicateError as e:
+        print(e)

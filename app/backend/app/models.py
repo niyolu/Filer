@@ -160,33 +160,3 @@ class GroupShare(Base):
     obj_id = Column(Integer, ForeignKey("storageobjects.id"), primary_key=True)
     
     permission = Column(String(10), default="R")
-    
-
-    
-# class Item(Base):
-#     __tablename__ = "items"
-
-#     id = Column(Integer, primary_key=True, index=True)
-#     title = Column(String(255), index=True)
-#     description = Column(String(255), index=True)
-#     owner_id = Column(Integer, ForeignKey("users.id"))
-
-#     owner = relationship("User", back_populates="items")
-    
-    
-# class DBA(Base):
-#     __tablename__ = "DBA"
-#     i = Column(Integer, primary_key=True, index=True)
-#     n = Column(String(255), index=True)
-    
-# class A(BaseModel):
-#     i: int
-#     n: str
-#     class Config:
-#         from_attributes = True
-    
-# a = DBA(i=1, n="hi")
-# print(a)
-# b = A.model_validate(a)
-# print(b)
-# print(DBA(**b.model_dump()))

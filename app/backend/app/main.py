@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, Response, Request
+from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, Response, Request, APIRouter
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -40,6 +40,10 @@ LocalSession = Annotated[Session, Depends(database.get_db)]
 
 crud.init_admin(next(database.get_db()))
 
+
+router_user = APIRouter(prefix="/users", tags=["users"])
+router_storage = APIRouter(prefix="/storage", tags=["router"])
+router_groups = APIRouter(prefix="/groups", tags=["groups"])
 
 async def get_current_user(
     token: Annotated[str, Depends(auth.oauth2_scheme)],
@@ -103,26 +107,25 @@ async def login(
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@app.get("/users/me", response_model=schemas.User)
+@router_user.get("/me", response_model=schemas.User)
 async def read_users_me(
     current_user: CurrentUser
 ):
     return current_user
 
 
-@app.get("/users", response_model=list[schemas.User])
+@router_user.get("/", response_model=list[schemas.User])
 def read_users(
     db: LocalSession
 ):
     return crud.get_users(db)
 
 
-@app.post("/users", response_model=schemas.User)
+@router_user.post("/", response_model=schemas.User)
 def create_user(
     user: schemas.UserCreate,
     db: LocalSession
 ):
-    
     hashed_password = auth.get_password_hash(user.password)
     db_user = crud.create_user(db=db, username=user.username, hashed_password=hashed_password)
     if not db_user:
@@ -130,7 +133,7 @@ def create_user(
     return db_user
 
 
-@app.post("/users/deactivate", response_model=schemas.User)
+@router_user.post("/deactivate", response_model=schemas.User)
 def deactivate_user(
     current_user: CurrentUser,
     db: LocalSession
@@ -138,7 +141,7 @@ def deactivate_user(
     return crud.change_active_status_for_user_by_username(db, current_user.username, False)
 
 
-@app.post("/users/activate", response_model=schemas.User)
+@router_user.post("/activate", response_model=schemas.User)
 def activate_user(
     admin: Admin,
     username: str,
@@ -152,14 +155,14 @@ def healthcheck():
     return "running"
 
 
-@app.get("/groups", response_model=list[schemas.Group])
+@router_groups.get("/groups", response_model=list[schemas.Group])
 def read_groups(
     db: LocalSession
 ):
     return crud.get_groups(db)
 
 
-@app.get("/groups/me", response_model=list[schemas.Group])
+@router_groups.get("/me", response_model=list[schemas.Group])
 def read_my_groups(
     current_user: CurrentUser,
     db: LocalSession
@@ -167,7 +170,7 @@ def read_my_groups(
     return crud.get_group_by_username(current_user.username)
 
 
-@app.post("/groups", response_model=schemas.Group)
+@router_groups.post("/", response_model=schemas.Group)
 def create_group(
     admin: Admin,
     db: LocalSession,
@@ -176,7 +179,7 @@ def create_group(
     return crud.create_group(db, group_name)
 
 
-@app.get("/storage")
+@router_storage.get("/")
 def read_own_files(
     current_user: CurrentUser,
     db: LocalSession
@@ -194,7 +197,7 @@ class BytesResponse(Response):
         super().__init__(content=content, media_type=media_type, headers=headers, status_code=status_code)
 
 
-@app.post("/storage/file", response_model=schemas.FileSummary)
+@router_storage.post("/file", response_model=schemas.FileSummary)
 async def upload_object(
     current_user: CurrentUser,
     db: LocalSession,
@@ -211,7 +214,7 @@ async def upload_object(
     return res
 
 
-@app.post("/storage/directory", response_model=schemas.DirectorySummary)
+@router_storage.post("/directory", response_model=schemas.DirectorySummary)
 async def download_object(
     current_user: CurrentUser,
     db: LocalSession,
@@ -225,7 +228,7 @@ async def download_object(
     return res
 
 
-@app.delete("/storage", response_model=list[schemas.FileSummary | schemas.DirectorySummary])
+@router_storage.delete("/", response_model=list[schemas.FileSummary | schemas.DirectorySummary])
 async def delete_object(
     current_user: CurrentUser,
     db: LocalSession,
@@ -242,7 +245,7 @@ async def delete_object(
     return deleted
 
 
-@app.get("/storage/download", response_class=BytesResponse)
+@router_storage.get("/download", response_class=BytesResponse)
 async def download_object(
     current_user: CurrentUser,
     db: LocalSession,
@@ -256,7 +259,7 @@ async def download_object(
     return BytesResponse(content=file.content, filename=file.name)
 
 
-@app.patch("/groups/join", response_model=schemas.Group)
+@router_groups.patch("/join", response_model=schemas.Group)
 def join_group(
     admin: Admin,
     db: LocalSession,
@@ -266,6 +269,13 @@ def join_group(
     group_id = crud.get_group_by_groupname(db, group_name).id
     user_id = crud.get_user_by_username(db, user_name).id
     return crud.add_user_to_group(db, group_id, user_id)
+
+
+
+app.include_router(router_user)
+app.include_router(router_storage)
+app.include_router(router_groups)
+
     
 
 # @app.get("/storage/{path}", response_model=schemas.StorageObject)

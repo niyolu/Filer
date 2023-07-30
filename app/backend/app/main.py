@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, Response, Request, APIRouter
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from sqlalchemy.orm import Session
 
@@ -34,33 +34,35 @@ app.add_middleware(
 @app.exception_handler(PermissionError)
 async def permission_exception_handler(request: Request, exc: PermissionError):
     logging.warn(str(exc))
-    return HTTPException(
+    return JSONResponse(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail=f"{exc}"
+        content={"message": f"Oopsie! {exc} did a happening."},
+    
     )
 
 @app.exception_handler(ValueError)
 async def valueerror_exception_handler(request: Request, exc: ValueError):
+    print("help")
     logging.warn(str(exc))
-    return HTTPException(
+    return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"{exc}"
+        content={"message": f"Oopsie! {exc} did a happening."},
     )
 
 @app.exception_handler(crud.DuplicateError)
 async def duplicate_exception_handler(request: Request, exc: crud.DuplicateError):
     logging.warn(str(exc))
-    return HTTPException(
+    return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"{exc}"
+        content={"message": f"Oopsie! {exc} did a happening."},
     )
     
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     logging.warn(str(exc))
-    return HTTPException(
+    return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"{exc}"
+        content={"message": f"Oopsie! {exc} did a happening."},
     )
 
 LocalSession = Annotated[Session, Depends(database.get_db)]
@@ -260,7 +262,7 @@ async def create_directory(
     db: LocalSession,
     directory: schemas.DirectoryCreate
 ):
-    user: models.User = crud.get_user_by_username(db, current_user.username)
+    user = crud.get_user_by_username(db, current_user.username)
     
     return crud.create_storage_object(db, user.id, directory.path, directory.name)
 

@@ -113,15 +113,13 @@ const FilePage = () => {
                 <button onClick={handleSubmit}>Submit</button>
 
             </Modal>
-            
-
             <FileTree data={testData} />
             
             
         </div>
     );
 };
-//<FileTree data={dirData.owned_files} />
+
 function getFolder(dir, path = [], pathIndex = 0) {
     const result = [];
 

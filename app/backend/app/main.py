@@ -30,21 +30,29 @@ app.add_middleware(
 )
 
 @app.exception_handler(PermissionError)
-async def unicorn_exception_handler(request: Request, exc: PermissionError):
+async def permission_exception_handler(request: Request, exc: PermissionError):
     return HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail=f"{exc}"
     )
 
 @app.exception_handler(ValueError)
-async def unicorn_exception_handler(request: Request, exc: PermissionError):
+async def valueerror_exception_handler(request: Request, exc: ValueError):
     return HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=f"{exc}"
     )
 
 @app.exception_handler(crud.DuplicateError)
-async def unicorn_exception_handler(request: Request, exc: PermissionError):
+async def duplicate_exception_handler(request: Request, exc: crud.DuplicateError):
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"{exc}"
+    )
+    
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    print(f"got general exception {type(exc)=}")
     return HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=f"{exc}"
@@ -277,6 +285,18 @@ async def download_object(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="resource is not a file")
     
     return BytesResponse(content=file.content, filename=file.name)
+
+
+@router_groups.patch("/join", response_model=schemas.Group)
+def add_user_to_group(
+    current_user: CurrentUser,
+    db: LocalSession,
+    group_name: str,
+    user_name: str
+):
+    group_id = crud.get_group_by_groupname(db, group_name).id
+    user_id = crud.get_user_by_username(db, user_name).id
+    return crud.add_user_to_group(db, group_id, user_id)
 
 
 @router_groups.patch("/join", response_model=schemas.Group)

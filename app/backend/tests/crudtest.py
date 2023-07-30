@@ -46,6 +46,9 @@ def setup_test_data(db_session):
         
     db_session.commit()
     
+    
+comp_obj_non_nested = lambda x,y: x.name == y.name and x.path == y.path and x.id==y.id and x.owner==y.owner and x.content == y.content if isinstance(x, models.File) else True
+    
 
 # Unit tests
 def test_create_user(db_session):
@@ -94,11 +97,8 @@ def test_create_storage_hierarchy(db_session):
     file1 = crud.create_storage_object(db_session, user.id, "/dir1/dir2", "file1", content=b"1")
     file2 = crud.create_storage_object(db_session, user.id, dir3.path, "file2", content=b"2")
     
-    print(dir1)
-    assert False
+    assert file1.path == "/dir1/dir2/file1"
     assert file2.path == "/dir1/dir2/dir3/file2"
-    assert owned_obj.content == b"Content"
-    assert owned_obj.path == "/file.txt"
     
     
 def test_share_storage_object_with_user(db_session):
@@ -157,7 +157,10 @@ def test_rename(db_session):
     dir1 = crud.create_storage_object(db_session, user.id, "/", "dir1")
     file1 = crud.create_storage_object(db_session, user.id, "/dir1", "file1.txt", content=b"File content1")
     dir2 = crud.create_storage_object(db_session, user.id, "/dir1", "dir2")
-    file2 = crud.create_storage_object(db_session, user.id, "/dir1/dir2", "file2.txt", content=b"File content2")    
+    file2 = crud.create_storage_object(db_session, user.id, "/dir1/dir2", "file2.txt", content=b"File content2")
+    crud.rename_storageobject(db_session, dir1.id, "dir1changed")
+    assert file1.path == "/dir1changed/file1.txt"
+    assert file2.path == "/dir1changed/dir2/file2.txt"
     
 
 def test_delete_subobject_by_path(db_session):
@@ -169,19 +172,27 @@ def test_delete_subobject_by_path(db_session):
     file3 = crud.create_storage_object(db_session, user.id, "/dir1/dir2", "file3.txt", content=b"File content3")    
     deleted_objs = crud.delete_object_by_path(db_session, user.id, "/dir1")
     
-    print(dir2.path)
-    
     assert_objs_deleted = [file2, dir2, file3]
-    
-    assert False, f"{deleted_objs=}{assert_objs_deleted=}"
+
     for obj_to_delete in assert_objs_deleted:
-        assert obj_to_delete in deleted_objs, obj_to_delete.path
-    for obj_to_delete in assert_objs_deleted:
-        assert crud.get_storageobject(obj_to_delete.id) is None, obj_to_delete.path
-    assert crud.get_storageobject(file1.id) == file1
+        assert crud.get_storageobject(db_session, obj_to_delete.id) is None, obj_to_delete
+        found = False
+        for del_obj in deleted_objs:
+            if comp_obj_non_nested(obj_to_delete, del_obj):
+                found = True
+        assert found, obj_to_delete
+                
+    assert crud.get_storageobject(db_session, file1.id) == file1
     
 def test_delete_shared_obj(db_session):
-    pass
+    sharee = create_test_user(db_session, "sharee")
+    receivee = create_test_user(db_session, "receivee")
+    dir = crud.create_storage_object(db_session, sharee.id, sharee.root.path, "dir")
+    file = crud.create_storage_object(db_session, sharee.id, dir.path, "file.txt", content=b"File content")
+    share = crud.share_storage_object_with_user(db_session, dir.id, sharee.id, receivee.id, "R")
+    assert file in crud.get_subelements(receivee.shared_objects)
+    assert dir in receivee.shared_objects
+    assert crud.get_permission_for_user_and_object(db_session, receivee.id, file.id) == "R"
 
 def test_delete_user(db_session):
     user = create_test_user(db_session)

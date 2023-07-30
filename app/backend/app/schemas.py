@@ -91,7 +91,7 @@ class FileCreate(StorageObjectCreate):
 
     
 class FileOverview(BaseModel):
-    owned_files: DirectorySummaryChildren
+    owned_objects: DirectorySummaryChildren
     shared_objects: list[Directory | File]
     group_shared_objects: dict[str, list[Directory | File]]
 

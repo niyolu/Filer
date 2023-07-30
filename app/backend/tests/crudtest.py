@@ -201,29 +201,42 @@ def test_get_all_objs_tree(db_session):
     initial_objs = crud.get_all_objs_tree(db_session, sharee.id)
     assert not initial_objs.shared_objects
     assert not initial_objs.group_shared_objects
-    assert initial_objs.owned_files[0].name == "/"
+    assert initial_objs.owned_objects.name == "/"
     
     receivee = create_test_user(db_session, "receivee")
-    groupsharee1 = create_test_user(db_session, "groupsharee")
-    groupsharee2 = create_test_user(db_session, "groupsharee")
+    groupsharee1 = create_test_user(db_session, "groupsharee1")
+    groupsharee2 = create_test_user(db_session, "groupsharee2")
+    
+    group = create_test_group(db_session)
+    group.members.extend([receivee, groupsharee1, groupsharee2])
     
     owned_file1 = crud.create_storage_object(db_session, receivee.id, receivee.root.path, "file1.txt", content=b"File content1")
     owned_dir1 = crud.create_storage_object(db_session, receivee.id, receivee.root.path, "dir1")
     owned_file2 = crud.create_storage_object(db_session, receivee.id, owned_dir1.path, "file2.txt", content=b"File content2")
     owned_dir2 = crud.create_storage_object(db_session, receivee.id, owned_dir1.path,  "dir2")
-    owned_file3 = crud.create_storage_object(db_session, receivee.id, owned_dir2.path, "file3.txt", content=b"File content3") 
+    owned_file3 = crud.create_storage_object(db_session, receivee.id, owned_dir2.path, "file3.txt", content=b"File content3")
     
-    dir = crud.create_storage_object(db_session, sharee.id, sharee.root.path, "dir")
-    file = crud.create_storage_object(db_session, sharee.id, dir.path, "file.txt", content=b"File content")
+    
+    shared_dir = crud.create_storage_object(db_session, sharee.id, sharee.root.path, "dir")
+    shared_file = crud.create_storage_object(db_session, sharee.id, shared_dir.path, "file.txt", content=b"File content")
+    
     group_shared_obj = crud.create_storage_object(db_session, groupsharee1.id, groupsharee1.root.path, "group_shared.txt", content=b"Group shared content")
-    share = crud.share_storage_object_with_user(db_session, dir.id, sharee.id, receivee.id, "R")
-    removefile = crud.create_storage_object(db_session, groupsharee2.id, sharee.root.path, "removefile", content=b"To be removed")
+    group_shared_obj_remove = crud.create_storage_object(db_session, groupsharee2.id, sharee.root.path, "removefile.txt", content=b"To be removed")
+
+    share = crud.share_storage_object_with_user(db_session, shared_dir.id, sharee.id, receivee.id, "R")
+    group_share = crud.share_storage_object_with_group(db_session, group_shared_obj.id, group.id, "RW")
+    group_share_remove = crud.share_storage_object_with_group(db_session, group_shared_obj_remove.id, group.id, "R")
     
-    group = create_test_group(db_session)
-    group.members.extend([receivee, groupsharee1])
+    midway_objs = crud.get_all_objs_tree(db_session, sharee.id)
+    midway_owned = midway_objs.owned_objects
+    midway_shared = midway_objs.shared_objects
+    midway_group_shared = midway_objs.group_shared_objects
+    assert any([comp_obj_non_nested(owned_file1, c) for c in midway_owned.children]), midway_owned.children
+    assert any([comp_obj_non_nested(owned_dir1, c) for c in midway_owned])
+    assert any([comp_obj_non_nested(owned_file2, cc) for c in midway_owned for cc in c.children if isinstance(c, models.Directory)])
+    assert any([comp_obj_non_nested(owned_dir2, cc) for c in midway_owned for cc in c.children if isinstance(c, models.Directory)])
+    assert any([comp_obj_non_nested(owned_file3, ccc) for c in midway_owned for ccc in cc.children for cc in c.children if isinstance(c, models.Directory) if isinstance(cc, models.Directory)])
     
-    
-    share = crud.share_storage_object_with_group(db_session, group_shared_obj.id, group.id, "R")
     
     
 if __name__ == "__main__":

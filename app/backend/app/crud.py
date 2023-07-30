@@ -362,7 +362,7 @@ def get_all_objs_tree(db: Session, user_id: int):
         for group in user.group_memberships
     }
     return schemas.FileOverview(
-        owned_files=owned_tree,
+        owned_objects=owned_tree,
         shared_objects=shared_trees,
         group_shared_objects=group_shared_trees
     )

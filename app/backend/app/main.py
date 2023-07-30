@@ -1,8 +1,9 @@
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException, status, UploadFile
+from fastapi import Depends, FastAPI, HTTPException, status, UploadFile, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 
 from sqlalchemy.orm import Session
 
@@ -27,6 +28,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(PermissionError)
+async def unicorn_exception_handler(request: Request, exc: PermissionError):
+    return HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=f"{exc}"
+    )
 
 LocalSession = Annotated[Session, Depends(database.get_db)]
 
@@ -63,7 +71,6 @@ async def get_current_active_user(
     return current_user
 
 
-    
 async def get_admin(
     current_user: Annotated[schemas.User, Depends(get_current_user)]
 ):
@@ -160,6 +167,15 @@ def read_users(
     return crud.get_group_by_username(current_user.username)
 
 
+@app.post("/groups", response_model=schemas.Group)
+def read_users(
+    admin: Admin,
+    db: LocalSession,
+    group_name: str
+):
+    return crud.create_group(db, group_name)
+
+
 @app.get("/storage/all")
 def read_own_files(
     current_user: CurrentUser,
@@ -169,19 +185,75 @@ def read_own_files(
     return crud.get_all_objs(db, user.id)
 
 
-@app.post("/storage/upload")
+class BytesResponse(Response):
+    def __init__(self, content: bytes, filename: str = None, status_code: int = 200):
+        media_type = "application/octet-stream"
+        headers = {}
+        if filename:
+            headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+        super().__init__(content=content, media_type=media_type, headers=headers, status_code=status_code)
+
+
+@app.post("/storage/upload", response_model=schemas.FileSummary)
 async def upload_object(
     current_user: CurrentUser,
     db: LocalSession,
-    file: UploadFile | None = None
+    file: UploadFile,
+    path: str
+):
+    user: models.User = crud.get_user_by_username(db, current_user.username)
+
+    filename = file.filename
+    content = file.file.read()
+    
+    res = crud.create_storage_object(db, user.id, path, filename, content=content)
+    
+    return res
+
+
+@app.post("/storage/directory", response_model=schemas.DirectorySummary)
+async def upload_object(
+    current_user: CurrentUser,
+    db: LocalSession,
+    path: str,
+    directory_name: str
 ):
     user: models.User = crud.get_user_by_username(db, current_user.username)
     
-    # TODO: check that this works
-    path, filename = file.filename.split(":") # [path:filename]
-    content = await file.read()
+    res = crud.create_storage_object(db, user.id, path, directory_name)
     
-    return crud.create_storage_object(db, user.id, path, filename, content=content)
+    return res
+
+
+@app.post("/storage/delete", response_model=list[schemas.FileSummary | schemas.DirectorySummary])
+async def upload_object(
+    current_user: CurrentUser,
+    db: LocalSession,
+    path: str,
+):
+    user = crud.get_user_by_username(db, current_user.username)
+    try:
+        deleted = crud.delete_object_by_path(db, user.id, path)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Incorrect username or password"
+        )
+    return deleted
+
+
+@app.post("/storage/download", response_class=BytesResponse)
+async def download_object(
+    current_user: CurrentUser,
+    db: LocalSession,
+    path: str
+):
+    user: models.User = crud.get_user_by_username(db, current_user.username)
+    file: models.StorageObject = crud.get_storageobject_by_path(db, user.id, path)
+    if not isinstance(file, models.File):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="resource is not a file")
+    
+    return BytesResponse(content=file.content, filename=file.name)
 
 
 @app.patch("/groups/join", response_model=schemas.Group)

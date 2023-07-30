@@ -48,20 +48,27 @@ class StorageObjectType(str, Enum):
     RW = "RW"
 
 
-class StorageObject(BaseModel):
+class StorageObjectBase(BaseModel):
     name: str
     path: str
-    type: str
-    
-    owner: User | None = None
-    
-    #parent: Directory | None # Optional[Directory_Ref] # "Optional[Directory]" 
-    
-    permission: Permission | None = None
     
     class Config:
         from_attributes = True
-        
+
+class StorageObject(StorageObjectBase):
+    owner: User | None = None
+    permission: Permission | None = None
+    type: str
+    #parent: Directory | None # Optional[Directory_Ref] # "Optional[Directory]" 
+
+
+class FileSummary(StorageObjectBase):
+    filetype: str
+    
+    
+class DirectorySummary(StorageObjectBase):
+    pass
+
 
 class StorageObjectDBID(StorageObject):
     id: int

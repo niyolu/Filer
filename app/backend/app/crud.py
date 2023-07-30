@@ -86,12 +86,13 @@ def get_shared_objs(db: Session, user_id: int):
 
 def rename_storageobject(db: Session, obj_id: int, new_name: str):
     def _update_path(obj: models.StorageObject):
-        obj.path = f"{obj.parent.path}/{new_name}"
-        if isinstance(obj, models.StorageObject):
+        parent_path = obj.parent.path
+        obj.path = f"{parent_path if parent_path != '/' else ''}/{obj.name}"
+        if isinstance(obj, models.Directory):
             for child in obj.children:
                 _update_path(child)
         
-    obj = get_storageobject_by_path(db, obj_id)
+    obj = get_storageobject(db, obj_id)
     obj.name = new_name
     _update_path(obj)
 
@@ -279,7 +280,7 @@ def delete_object(
         owner.used -= len(obj.content)
     else:
         for child in obj.children:
-            deleted.append(delete_object(db, child))
+            deleted.extend(delete_object(db, child))
     db.delete(obj)
     db.commit()
     deleted.append(obj)
@@ -313,11 +314,16 @@ def get_subelements(elements: list[models.StorageObject]):
     return subelements
 
 
-def get_all_objs(db: Session, user_id):
+def get_all_objs(db: Session, user_id: int):
+    owned, shared, group_shared = get_all_objs_flat(db, user_id)
+    return owned, get_subelements(shared), {g:get_subelements(sh) for g, sh in group_shared.items()}
+
+
+def get_all_objs_flat(db: Session, user_id: int):
     user = get_user(db, user_id)
     owned_objs = user.owned_objects
-    shared_objs = get_subelements(user.shared_objects)
-    group_shared_objs = {group.name: get_subelements(group.shared_objects) for group in user.group_memberships}
+    shared_objs = user.shared_objects
+    group_shared_objs = {group.name: group.shared_objects for group in user.group_memberships}
     return owned_objs, shared_objs, group_shared_objs
     
     

@@ -153,14 +153,14 @@ def root():
 
 
 @app.get("/groups", response_model=list[schemas.Group])
-def read_users(
+def read_groups(
     db: LocalSession
 ):
     return crud.get_groups(db)
 
 
 @app.get("/groups/me", response_model=list[schemas.Group])
-def read_users(
+def read_my_groups(
     current_user: CurrentUser,
     db: LocalSession
 ):
@@ -168,7 +168,7 @@ def read_users(
 
 
 @app.post("/groups", response_model=schemas.Group)
-def read_users(
+def create_group(
     admin: Admin,
     db: LocalSession,
     group_name: str
@@ -176,7 +176,7 @@ def read_users(
     return crud.create_group(db, group_name)
 
 
-@app.get("/storage/all")
+@app.get("/storage")
 def read_own_files(
     current_user: CurrentUser,
     db: LocalSession
@@ -194,7 +194,7 @@ class BytesResponse(Response):
         super().__init__(content=content, media_type=media_type, headers=headers, status_code=status_code)
 
 
-@app.post("/storage/upload", response_model=schemas.FileSummary)
+@app.post("/storage/file", response_model=schemas.FileSummary)
 async def upload_object(
     current_user: CurrentUser,
     db: LocalSession,
@@ -212,7 +212,7 @@ async def upload_object(
 
 
 @app.post("/storage/directory", response_model=schemas.DirectorySummary)
-async def upload_object(
+async def download_object(
     current_user: CurrentUser,
     db: LocalSession,
     path: str,
@@ -225,8 +225,8 @@ async def upload_object(
     return res
 
 
-@app.post("/storage/delete", response_model=list[schemas.FileSummary | schemas.DirectorySummary])
-async def upload_object(
+@app.delete("/storage", response_model=list[schemas.FileSummary | schemas.DirectorySummary])
+async def delete_object(
     current_user: CurrentUser,
     db: LocalSession,
     path: str,
@@ -242,7 +242,7 @@ async def upload_object(
     return deleted
 
 
-@app.post("/storage/download", response_class=BytesResponse)
+@app.get("/storage/download", response_class=BytesResponse)
 async def download_object(
     current_user: CurrentUser,
     db: LocalSession,
@@ -267,7 +267,6 @@ def join_group(
     user_id = crud.get_user_by_username(db, user_name).id
     return crud.add_user_to_group(db, group_id, user_id)
     
-
 
 # @app.get("/storage/{path}", response_model=schemas.StorageObject)
 # def read_file(

@@ -20,14 +20,11 @@ def create_sample_data():
     #     session.delete(user)
     
     session.commit()
-    input("1")
     
     session.query(models.User).delete()
     session.query(models.Group).delete()
     session.commit()
-    input("2")
     try:
-        input("3")
         user1 = User(username="User1", hashed_password="bye")
         user2 = User(username="User2", hashed_password="bye")
         user3 = User(username="User3", hashed_password="bye", root=None)

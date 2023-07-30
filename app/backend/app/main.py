@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from jose import JWTError
 
-import logging
+from logger import logger
 
 import crud, models, schemas, auth, database
 
@@ -31,9 +31,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.get("/logtest")
+async def read_root():
+    logger.debug("This is a debug message.")
+    logger.info("This is an info message.")
+    logger.warning("This is a warning message.")
+    logger.error("This is an error message.")
+    logger.critical("This is a critical message.")
+    return {"message": "Hello, World!"}
+
+
 @app.exception_handler(PermissionError)
 async def permission_exception_handler(request: Request, exc: PermissionError):
-    logging.warn(str(exc))
+    logger.warn(str(exc))
     return JSONResponse(
         status_code=status.HTTP_403_FORBIDDEN,
         content={"message": f"Oopsie! {exc} did a happening."},
@@ -43,7 +54,7 @@ async def permission_exception_handler(request: Request, exc: PermissionError):
 @app.exception_handler(ValueError)
 async def valueerror_exception_handler(request: Request, exc: ValueError):
     print("help")
-    logging.warn(str(exc))
+    logger.warn(str(exc))
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
         content={"message": f"Oopsie! {exc} did a happening."},
@@ -51,7 +62,7 @@ async def valueerror_exception_handler(request: Request, exc: ValueError):
 
 @app.exception_handler(crud.DuplicateError)
 async def duplicate_exception_handler(request: Request, exc: crud.DuplicateError):
-    logging.warn(str(exc))
+    logger.warn(str(exc))
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
         content={"message": f"Oopsie! {exc} did a happening."},
@@ -59,7 +70,9 @@ async def duplicate_exception_handler(request: Request, exc: crud.DuplicateError
     
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
-    logging.warn(str(exc))
+    if isinstance(exc, KeyboardInterrupt):
+        raise exc
+    logger.warn(str(exc))
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
         content={"message": f"Oopsie! {exc} did a happening."},
@@ -85,14 +98,14 @@ async def get_current_user(
     try:
         token_data: schemas.TokenData | None = auth.decode_token(token)
         if token_data is None:
-            logging.warn(credentials_exception)
+            logger.warn(credentials_exception)
             raise credentials_exception
     except JWTError:
-        logging.warn(credentials_exception)
+        logger.warn(credentials_exception)
         raise credentials_exception
     user = crud.get_user_by_username(db, token_data.username)
     if not user:
-        logging.warn(credentials_exception)
+        logger.warn(credentials_exception)
         raise credentials_exception
     
     return schemas.User.model_validate(user)
@@ -102,7 +115,7 @@ async def get_current_active_user(
     current_user: Annotated[schemas.User, Depends(get_current_user)]
 ):
     if not current_user.is_active:
-        logging.warn("inactive user")
+        logger.warn("inactive user")
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
@@ -111,7 +124,7 @@ async def get_admin(
     current_user: Annotated[schemas.User, Depends(get_current_user)]
 ):
     if not current_user.username == "root":
-        logging.warn("Invalid action 401 UNAUTHORIZED")
+        logger.warn("Invalid action 401 UNAUTHORIZED")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid action",
@@ -131,7 +144,7 @@ async def login(
 ):
     user: schemas.User = auth.authenticate_user(db, form_data.username, form_data.password)
     if not user:
-        logging.warn("Incorrect username or password Invalid action 401 UNAUTHORIZED")
+        logger.warn("Incorrect username or password Invalid action 401 UNAUTHORIZED")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -163,7 +176,7 @@ def create_user(
     hashed_password = auth.get_password_hash(user.password)
     db_user = crud.create_user(db=db, username=user.username, hashed_password=hashed_password)
     if not db_user:
-        logging.warn("Incorrect username or password Invalid action 400 BAD REQUEST")
+        logger.warn("Incorrect username or password Invalid action 400 BAD REQUEST")
         raise Exception("User already registered")
     return db_user
 
@@ -251,7 +264,7 @@ async def upload_object(
     user: models.User = crud.get_user_by_username(db, current_user.username)
 
     filename = file.filename
-    content = file.file.read()
+    content = await file.read()
     
     res = crud.create_storage_object(db, user.id, path, filename, content=content)
     
@@ -288,11 +301,10 @@ async def download_object(
     user: models.User = crud.get_user_by_username(db, current_user.username)
     file: models.StorageObject = crud.get_storageobject_by_path(db, user.id, path)
     if not isinstance(file, models.File):
-        logging.warn("resource is not a file")
+        logger.warn("resource is not a file")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="resource is not a file")
     
     return BytesResponse(content=file.content, filename=file.name)
-
 
 
 @router_groups.patch("/join", response_model=schemas.Group)

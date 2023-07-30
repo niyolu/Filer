@@ -1,4 +1,4 @@
-from sqlalchemy import Table, Boolean, Column, ForeignKey, Integer, String, BigInteger, LargeBinary
+from sqlalchemy import Table, Boolean, Column, ForeignKey, Integer, String, BigInteger, LargeBinary, BLOB
 from sqlalchemy.orm import relationship
 
 from database import Base, SerializableBase
@@ -88,7 +88,7 @@ class File(StorageObject):
     id = Column(Integer, ForeignKey("storageobjects.id"), primary_key=True, index=True)
     
     filetype = Column(String(255))
-    content = Column(LargeBinary)
+    content = Column(LargeBinary(length=1024**3))
     
     __mapper_args__ = {
         "polymorphic_identity": "files",
@@ -120,7 +120,7 @@ class Directory(StorageObject):
         return super().__repr__().replace(super().__class__.__name__, self.__class__.__name__)
     
     def __str__(self) -> str:
-        return f"{self!r} children({','.join([repr(child) for child in self.children])})"
+        return f"{self!r} children({','.join([str(child) for child in self.children])})"
 
 
 class Group(Base):

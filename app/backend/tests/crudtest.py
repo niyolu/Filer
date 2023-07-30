@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-import crud, database, config, models
+import crud, database, config, models, schemas
 #from app.models import User, Directory, File, StorageObject
 
 import pytest
@@ -46,8 +46,25 @@ def setup_test_data(db_session):
         
     db_session.commit()
     
-    
-comp_obj_non_nested = lambda x,y: x.name == y.name and x.path == y.path and x.id==y.id and x.owner==y.owner and x.content == y.content if isinstance(x, models.File) else True
+def comp_obj_non_nested(x,y,own=True,id=True,content=True):
+    valid = x.name == y.name and x.path == y.path
+    if not valid:
+        print("id or path bad")
+    if id and all(isinstance(o, models.Base) for o in (x, y)):
+        r = x.id == y.id
+        if not r:
+            print("id bad")
+        valid &= r
+    if own and all(isinstance(o, (models.StorageObject, schemas.StorageObject)) for o in (x, y)):
+        r = x.owner==y.owner
+        if not r:
+            print("owner bad")
+        valid &= r
+    if content and all(isinstance(o, models.File) for o in (x, y)):
+        r = x.content == y.content
+        if not r:
+            print("content bad")
+    return valid
     
 
 # Unit tests
@@ -218,7 +235,7 @@ def test_get_all_objs_tree(db_session):
     
     
     shared_dir = crud.create_storage_object(db_session, sharee.id, sharee.root.path, "dir")
-    shared_file = crud.create_storage_object(db_session, sharee.id, shared_dir.path, "file.txt", content=b"File content")
+    shared_file = crud.create_storage_object(db_session, sharee.id, shared_dir.path, "shf.txt", content=b"File content")
     
     group_shared_obj = crud.create_storage_object(db_session, groupsharee1.id, groupsharee1.root.path, "group_shared.txt", content=b"Group shared content")
     group_shared_obj_remove = crud.create_storage_object(db_session, groupsharee2.id, sharee.root.path, "removefile.txt", content=b"To be removed")
@@ -227,20 +244,24 @@ def test_get_all_objs_tree(db_session):
     group_share = crud.share_storage_object_with_group(db_session, group_shared_obj.id, group.id, "RW")
     group_share_remove = crud.share_storage_object_with_group(db_session, group_shared_obj_remove.id, group.id, "R")
     
-    midway_objs = crud.get_all_objs_tree(db_session, sharee.id)
+    midway_objs = crud.get_all_objs_tree(db_session, receivee.id)
     midway_owned = midway_objs.owned_objects
     midway_shared = midway_objs.shared_objects
     midway_group_shared = midway_objs.group_shared_objects
+    print(owned_file1)
     print(midway_objs)
-    print("--\n")
-    print(midway_owned.children)
-    print(type(midway_owned.children))
-    assert any([comp_obj_non_nested(owned_file1, c) for c in midway_owned.children]), midway_owned.children
-    assert any([comp_obj_non_nested(owned_dir1, c) for c in midway_owned])
-    assert any([comp_obj_non_nested(owned_file2, cc) for c in midway_owned for cc in c.children if isinstance(c, models.Directory)])
-    assert any([comp_obj_non_nested(owned_dir2, cc) for c in midway_owned for cc in c.children if isinstance(c, models.Directory)])
-    assert any([comp_obj_non_nested(owned_file3, ccc) for c in midway_owned for ccc in cc.children for cc in c.children if isinstance(c, models.Directory) if isinstance(cc, models.Directory)])
     
+    midway_owned = crud.get_subelements_schema(midway_owned)
+    for o in midway_owned:
+        assert any(comp_obj_non_nested())
+        
+
+    assert any([comp_obj_non_nested(owned_file1, c) for c in midway_owned.children])
+    assert any([comp_obj_non_nested(owned_dir1, c) for c in midway_owned.children])
+    assert any([comp_obj_non_nested(owned_file2, cc)  for cc in [c.children for c in midway_owned.children if isinstance(c, models.Directory)]])
+    assert any([comp_obj_non_nested(owned_dir2, cc) for cc in [c.children for c in midway_owned.children if isinstance(c, models.Directory)]])
+    assert any([comp_obj_non_nested(owned_file3, ccc) for ccc in [cc.children for cc in [c.children for c in midway_owned.children if isinstance(c, models.Directory)] if isinstance(cc, models.Directory)]])
+
     
     
 if __name__ == "__main__":

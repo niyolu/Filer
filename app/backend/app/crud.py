@@ -2,9 +2,9 @@ from sqlalchemy.orm import Session, joinedload
 
 import collections
 import itertools
-import functools
 
 import models, utils, auth, schemas
+from logger import logger
 
 
 class DuplicateError(Exception):
@@ -339,6 +339,18 @@ def get_subelements(elements: list[models.StorageObject]):
     return subelements
 
 
+def get_subelements_schema(elements: list[schemas.StorageObject]):
+    working_set = collections.deque(elements)
+    subelements = []
+    while working_set:
+        element = working_set.popleft()
+        subelements.append(element)
+        match(element):
+            case schemas.Directory(children=children):
+                working_set.extend(children)
+    return subelements
+
+
 def get_all_objs(db: Session, user_id: int):
     owned, shared, group_shared = get_all_objs_flat(db, user_id)
     return owned, get_subelements(shared), {g:get_subelements(sh) for g, sh in group_shared.items()}
@@ -354,11 +366,17 @@ def get_all_objs_flat(db: Session, user_id: int):
     
 def get_all_objs_tree(db: Session, user_id: int):
     user: models.User = get_user(db, user_id)
-    build = functools.partial(build_tree, user_id=user.id, db=db)
+    def _build(obj):
+        return (
+            build_tree(db, user.id, obj)
+            if isinstance(obj, models.Directory) else
+            schemas.File.model_validate(obj)
+        )
+
     owned_tree = schemas.DirectorySummaryChildren.model_validate(user.root)
-    shared_trees = [build(obj) for obj in user.shared_objects]
+    shared_trees = [_build(obj) for obj in user.shared_objects]
     group_shared_trees = {
-        group.name: [build(obj) for obj in group.shared_objects]
+        group.name: [_build(obj) for obj in group.shared_objects]
         for group in user.group_memberships
     }
     return schemas.FileOverview(
@@ -390,13 +408,14 @@ def change_user_quota(db: Session, user_id: int, new_quota: int):
 def build_tree(db: Session, user_id: int, root: models.Directory):
     # seems this is equivalent to calling models.Directory.model_validate lmfao
     permission = get_permission_for_user_and_object(db, user_id, root.id)
-    tree = schemas.Directory(
-        name=root.name, path=root.path, owner=root.owner,
-        permission=permission
+    
+    tree = schemas.Directory.model_validate(
+        root#**root.to_dict(), permission=permission,
     )
+
     if not root.children:
         return tree
-    
+   
     working_set = collections.deque()
     
     def _update(parent: models.Directory):
@@ -404,7 +423,7 @@ def build_tree(db: Session, user_id: int, root: models.Directory):
         if not children:
             return
         files = [
-            schemas.File.model_validate(
+            schemas.FileSummary(
                 **c.to_dict(), permission=permission
             )
             for c in children
@@ -425,7 +444,7 @@ def build_tree(db: Session, user_id: int, root: models.Directory):
     
     while working_set:
         current, parent = working_set.popleft()
-        new_node = schemas.Directory.model_validate(**current.to_dict(), permission=permission)
+        new_node = schemas.Directory(**current.to_dict(), permission=permission)
         parent.children.append(new_node)
         _update(new_node)
     
@@ -433,10 +452,17 @@ def build_tree(db: Session, user_id: int, root: models.Directory):
 
 
 def init_admin(db: Session):
+    create_admin = lambda : create_user(
+        db, auth.settings.app_admin_name, auth.get_password_hash(auth.settings.app_admin_pw),
+        quota=auth.settings.app_admin_quota_mb * 1024 ** 2, max_objects_per_dir=auth.settings.app_admin_max_objects_per_dir
+    )
     try:
-        create_user(
-            db, "root", auth.get_password_hash(auth.settings.app_admin_pw),
-            quota=1000, max_objects_per_dir=100
-        )
+        create_admin()
     except DuplicateError as e:
-        print(e)
+        logger.error(e)
+        if auth.settings.app_force_create_admin:
+            logger.info("refreshing admin")
+            admin = get_user_by_username(db, auth.settings.app_admin_name)
+            delete_user(db, admin.id)
+            create_admin()
+

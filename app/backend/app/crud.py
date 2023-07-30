@@ -109,7 +109,7 @@ def create_user(
     max_objects_per_dir: int | None = None
 ):
     if get_user_by_username(db, username) is not None:
-        raise DuplicateError("User already exists")
+        raise DuplicateError(f"User {username} already exists")
     user = models.User(
         username=username, hashed_password=hashed_password,
         quota=quota, max_objects_per_dir=max_objects_per_dir
@@ -130,9 +130,9 @@ def create_storage_object(
     content: bytes | None = None
 ) -> models.StorageObject:
     if "/" not in path:
-        raise ValueError("Invalid path.")
+        raise ValueError(f"Invalid path ({path}).")
     if "/" in object_name:
-        raise ValueError("invalid name")
+        raise ValueError(f"invalid name ({object_name})")
     
     parent: models.Directory = get_storageobject_by_path(db, user_id, path)
     if not parent:
@@ -147,15 +147,15 @@ def create_storage_object(
     obj_path = f"{path}/{object_name}"
     
     if get_storageobject_by_path(db, user_id, obj_path):
-        raise DuplicateError("Object already exists")
+        raise DuplicateError(f"Object {obj_path} already exists")
 
     if len(parent.children) >= owner.max_objects_per_dir:
-        raise PermissionError("Exceeds max objects per directory limit.")
+        raise PermissionError(f"Exceeds max objects per directory limit ({parent.children}/{owner.max_objects_per_dir}).")
     
     if content:
         new_used = owner.used + len(content)
         if new_used > owner.quota:
-            raise PermissionError("Exceeds user's storage quota.")
+            raise PermissionError(f"Exceeds user's storage quota ({new_used}/{owner.quota}).")
         owner.used = new_used
         filetype = utils.file_type_from_extension(object_name)
         file = models.File(name=object_name, owner=owner, content=content, parent=parent, filetype=filetype, path=obj_path)
@@ -173,7 +173,7 @@ def create_storage_object(
     
 def create_group(db: Session, name: str):
     if get_group_by_groupname(db, name):
-        return DuplicateError("Group already exists")
+        return DuplicateError(f"Group already exists´({name})")
     group = models.Group(name=name)
     db.add(group)
     db.commit()
@@ -314,7 +314,7 @@ def delete_object(
 def delete_object_by_path(db: Session, user_id: int, path: str):
     obj= get_storageobject_by_path(db, user_id, path)
     if not obj:
-        raise ValueError("Invalid path.")
+        raise ValueError(f"Invalid path ({path}).")
     return delete_object(db, obj)
 
 

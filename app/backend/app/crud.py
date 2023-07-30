@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session, joinedload
 
 import collections
 import itertools
+import functools
 
 import models, utils, auth, schemas
 
@@ -172,7 +173,12 @@ def create_group(db: Session, name: str):
     return group
 
 
-def get_permission_for_user_and_object(db: Session, user_id: int, obj_id: int):
+def get_permission_for_user_and_object(
+    db: Session,
+    user_id: int,
+    obj_id: int
+):
+
     user: models.User = get_user(db, user_id)
 
     def check_permission(obj):
@@ -198,7 +204,12 @@ def get_permission_for_user_and_object(db: Session, user_id: int, obj_id: int):
 
         return None
 
-    obj = db.query(models.StorageObject).options(joinedload(models.StorageObject.parent)).filter_by(id=obj_id).first()
+    obj = (
+        db.query(models.StorageObject)
+        .options(joinedload(models.StorageObject.parent))
+        .filter_by(id=obj_id)
+        .first()
+    )
     while obj is not None:
         permission = check_permission(obj)
         if permission is not None:
@@ -216,8 +227,13 @@ def change_active_status_for_user_by_username(db: Session, username: str, state:
     return user
 
 
-
-def share_storage_object_with_user(db: Session, obj_id: int, from_user_id: int, to_user_id: int, permission: str):
+def share_storage_object_with_user(
+    db: Session,
+    obj_id: int,
+    from_user_id: int,
+    to_user_id: int,
+    permission: str
+):
     """Share an existing storage object with another user
 
     Args:
@@ -327,6 +343,22 @@ def get_all_objs_flat(db: Session, user_id: int):
     return owned_objs, shared_objs, group_shared_objs
     
     
+def get_all_objs_tree(db: Session, user_id: int):
+    user: models.User = get_user(db, user_id)
+    owned_tree = schemas.DirectorySummaryChildren.model_validate(user.root)
+    build = functools.partial(build_tree, user_id=user.id, db=db)
+    shared_trees = [build(obj) for obj in user.shared_objects]
+    group_shared_trees = {
+        group.name: [build(obj) for obj in group.shared_objects]
+        for group in user.group_memberships
+    }
+    return schemas.FileOverview(
+        owned_files=owned_tree,
+        shared_objects=shared_trees,
+        group_shared_objects=group_shared_trees
+    )
+
+    
 def add_user_to_group(db: Session, group_id: int, user_id: int):
     group: models.Group = get_group(db, group_id)
     user: models.User = get_user(db, user_id)
@@ -344,20 +376,33 @@ def change_user_quota(db: Session, user_id: int, new_quota: int):
     return user
 
 
-def build_tree(root: models.Directory):
+def build_tree(db: Session, user_id: int, root: models.Directory):
     # seems this is equivalent to calling models.Directory.model_validate lmfao
-    tree = schemas.Directory.model_validate(root)
+    permission = get_permission_for_user_and_object(db, user_id, root.id)
+    tree = schemas.Directory(
+        name=root.name, path=root.path, owner=root.owner,
+        permission=permission
+    )
     if not root.children:
         return tree
     
     working_set = collections.deque()
     
-    def _update(parent: schemas.Directory):
+    def _update(parent: models.Directory):
         children: list[models.StorageObject] = parent.children
         if not children:
             return
-        files = [schemas.File.model_validate(c) for c in children if isinstance(c, models.File)]
-        directories = [c for c in children if isinstance(c, models.Directory)]
+        files = [
+            schemas.File.model_validate(
+                **c.to_dict(), permission=permission
+            )
+            for c in children
+            if isinstance(c, models.File)
+        ]
+        directories = [
+            c for c in children
+            if isinstance(c, models.Directory)
+        ]
         parent.children.extend(files)
         if directories:
             working_set.extend(itertools.product(directories, [parent]))
@@ -369,7 +414,7 @@ def build_tree(root: models.Directory):
     
     while working_set:
         current, parent = working_set.popleft()
-        new_node = schemas.Directory.model_validate(current)
+        new_node = schemas.Directory.model_validate(**current.to_dict(), permission=permission)
         parent.children.append(new_node)
         _update(new_node)
     

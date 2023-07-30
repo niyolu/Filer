@@ -179,13 +179,22 @@ def create_group(
     return crud.create_group(db, group_name)
 
 
-@router_storage.get("/")
-def read_own_files(
+@router_groups.post("/members", response_model=list[schemas.User])
+def create_group(
+    current_user: CurrentUser,
+    db: LocalSession,
+    group_name: str
+):
+    return crud.create_group(db, group_name)
+
+
+@router_storage.get("/", response_model=schemas.FileOverview)
+def read_files(
     current_user: CurrentUser,
     db: LocalSession
 ):
     user: models.User = crud.get_user_by_username(db, current_user.username)
-    return crud.get_all_objs(db, user.id)
+    return crud.get_all_objs_tree(db, user.id)
 
 
 class BytesResponse(Response):
@@ -218,13 +227,11 @@ async def upload_object(
 async def create_directory(
     current_user: CurrentUser,
     db: LocalSession,
-    path: str,
-    directory_name: str
+    directory: schemas.DirectoryCreate
 ):
     user: models.User = crud.get_user_by_username(db, current_user.username)
     
-    return crud.create_storage_object(db, user.id, path, directory_name)
-    
+    return crud.create_storage_object(db, user.id, directory.path, directory.name)
 
 
 @router_storage.delete("/", response_model=list[schemas.FileSummary | schemas.DirectorySummary])
@@ -259,7 +266,7 @@ async def download_object(
 
 
 @router_groups.patch("/join", response_model=schemas.Group)
-def join_group(
+def add_user_to_group(
     admin: Admin,
     db: LocalSession,
     group_name: str,

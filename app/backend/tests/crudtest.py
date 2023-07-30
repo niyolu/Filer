@@ -66,7 +66,7 @@ def test_create_group(db_session):
     group = create_test_group(db_session)
     assert group.id is not None
     assert group.name == "testgroup"
-
+    
 def test_add_user_to_group(db_session):
     user = create_test_user(db_session)
     group = create_test_group(db_session)
@@ -74,20 +74,19 @@ def test_add_user_to_group(db_session):
     
     user_groups = crud.get_user_groups(db_session, user_id=user.id)
     assert group in user_groups
-    
+
 def test_change_active_status_for_user_by_username(db_session):
     user = create_test_user(db_session)
     assert user.is_active is True
     
     updated_user = crud.change_active_status_for_user_by_username(db_session, "testuser", False)
     assert updated_user.is_active is False
-    
+ 
 def test_create_storage_object(db_session):
     user = create_test_user(db_session)
     owned_obj = crud.create_storage_object(db_session, user.id, "/", "file.txt", content=b"Content")
     assert owned_obj.content == b"Content"
     assert owned_obj.path == "/file.txt"
-
 
 def test_create_storage_hierarchy(db_session):
     user = create_test_user(db_session)
@@ -100,18 +99,15 @@ def test_create_storage_hierarchy(db_session):
     assert file1.path == "/dir1/dir2/file1"
     assert file2.path == "/dir1/dir2/dir3/file2"
     
-    
 def test_share_storage_object_with_user(db_session):
     user1 = create_test_user(db_session, "user1")
     user2 = create_test_user(db_session, "user2")
-    group = create_test_group(db_session)
-    group.members.extend([user1, user2])
-    group_shared_obj = crud.create_storage_object(db_session, user2.id, "/", "group_shared.txt", content=b"Group shared content")
-    share = crud.share_storage_object_with_group(db_session, group_shared_obj.id, group.id, "R")
+    shared_obj = crud.create_storage_object(db_session, user1.id, "/", "shared.txt", content=b"Shared content")
+    assert shared_obj in user1.owned_objects
+    share = crud.share_storage_object_with_user(db_session, shared_obj.id, user1.id, user2.id, "R")
     assert share is not None
     assert len(user2.shared_objects) == 1
-    assert user2.shared_objects[0] == shared_obj 
-
+    assert user2.shared_objects[0] == shared_obj
 
 def test_group_share_storage_object(db_session):
     user1 = create_test_user(db_session, "user1")
@@ -202,15 +198,20 @@ def test_delete_user(db_session):
     
 def test_get_all_objs_tree(db_session):
     sharee = create_test_user(db_session, "sharee")
+    initial_objs = crud.get_all_objs_tree(db_session, sharee.id)
+    assert not initial_objs.shared_objects
+    assert not initial_objs.group_shared_objects
+    assert initial_objs.owned_files[0].name == "/"
+    
     receivee = create_test_user(db_session, "receivee")
     groupsharee1 = create_test_user(db_session, "groupsharee")
     groupsharee2 = create_test_user(db_session, "groupsharee")
     
-    owned_file1 = crud.create_storage_object(db_session, sharee.id, "/", "file1.txt", content=b"File content1")
-    owned_dir1 = crud.create_storage_object(db_session, sharee.id, "/", "dir1")
-    owned_file2 = crud.create_storage_object(db_session, sharee.id, "/dir1", "file2.txt", content=b"File content2")
-    owned_dir2 = crud.create_storage_object(db_session, sharee.id, "/dir1", "dir2")
-    owned_file3 = crud.create_storage_object(db_session, sharee.id, "/dir1/dir2", "file3.txt", content=b"File content3") 
+    owned_file1 = crud.create_storage_object(db_session, receivee.id, receivee.root.path, "file1.txt", content=b"File content1")
+    owned_dir1 = crud.create_storage_object(db_session, receivee.id, receivee.root.path, "dir1")
+    owned_file2 = crud.create_storage_object(db_session, receivee.id, owned_dir1.path, "file2.txt", content=b"File content2")
+    owned_dir2 = crud.create_storage_object(db_session, receivee.id, owned_dir1.path,  "dir2")
+    owned_file3 = crud.create_storage_object(db_session, receivee.id, owned_dir2.path, "file3.txt", content=b"File content3") 
     
     dir = crud.create_storage_object(db_session, sharee.id, sharee.root.path, "dir")
     file = crud.create_storage_object(db_session, sharee.id, dir.path, "file.txt", content=b"File content")

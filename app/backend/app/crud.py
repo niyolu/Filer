@@ -96,10 +96,19 @@ def rename_storageobject(db: Session, obj_id: int, new_name: str):
     _update_path(obj)
 
 
-def create_user(db: Session, username: str, hashed_password: str):
+def create_user(
+    db: Session,
+    username: str,
+    hashed_password: str,
+    quota: int | None = None,
+    max_objects_per_dir: int | None = None
+):
     if get_user_by_username(db, username) is not None:
         return
-    user = models.User(username=username, hashed_password=hashed_password)
+    user = models.User(
+        username=username, hashed_password=hashed_password,
+        quota=quota, max_objects_per_dir=max_objects_per_dir
+    )
     root_dir = models.Directory(name="/", path="/", owner=user)
     user.root = root_dir
     db.add(user)
@@ -152,6 +161,14 @@ def create_storage_object(
         db.commit()
         db.refresh(directory)
         return directory
+    
+    
+def create_group(db: Session, name: str):
+    group = models.Group(name=name)
+    db.add(group)
+    db.commit()
+    db.refresh(group)
+    return group
 
 
 def get_permission_for_user_and_object(db: Session, user_id: int, obj_id: int):
@@ -354,4 +371,6 @@ def build_tree(root: models.Directory):
 
 
 def init_admin(db: Session):
-    create_user(db, "root", auth.get_password_hash(auth.settings.app_admin_pw))
+    create_user(
+        db, "root", auth.get_password_hash(auth.settings.app_admin_pw),
+        quota=1000, max_objects_per_dir=100)

@@ -101,3 +101,7 @@ class DirectoryCreate(BaseModel):
 class Group(BaseModel):
     name: str
     members: list[User]
+
+
+class GroupWithShare(Group):
+    shared: list[File | Directory] | None

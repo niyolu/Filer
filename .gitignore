@@ -1,5 +1,5 @@
 *.pdf
 __pycache__
 node_modules
-pytest_cache
+.pytest_cache
 .vscode

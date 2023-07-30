@@ -148,7 +148,7 @@ def activate_user(
 
 
 @app.get("/")
-def root():
+def healthcheck():
     return "running"
 
 

@@ -52,35 +52,68 @@ function FolderNode({ folder }) {
                     <input type="file" name="file" />
                     <input type='hidden' id='token-input' name='token' />
                     <button onClick={() => {
-                        const fileInput = document.getElementById('file-input');
-                        const file = fileInput.files[0];
+                        async function upload(formData, path) {
+                            try {
+                              const response = await fetch(`http://127.0.0.1:8000/storage/file?path=${path}`, {
+                                method: "POST",
+                                body: formData,
+                              });
+                              const result = await response.json();
+                              console.log("Success:", result);
+                            } catch (error) {
+                              console.error("Error:", error);
+                            }
+                        }
 
-                        // Get the authentication token from localStorage
                         const token = localStorage.getItem('authToken');
                         if (!token) {
                             console.error('Authentication token not found.');
                             return;
                         }
 
-                        // Construct the headers with the token and Content-Type for file upload
-                        const headers = new Headers();
-                        headers.append('Authorization', `Bearer ${token}`);
-                        headers.append('Content-Type', 'multipart/form-data'); // Set the correct Content-Type
-
-                        // Create a FormData object to send the file
+                        // const fileInput = document.getElementById('file-input');
+                        // const file = fileInput.files[0];
+                        
                         const formData = new FormData();
-                        formData.append('file', file);
+                        const fileField = document.querySelector('input[type="file"]');
+                        
+                        formData.append('Authorization', `Bearer ${token}`);
+                        formData.append('file', fileField.files[0]);
+                        
+                        upload(formData);
+                          
+                        // const fileInput = document.getElementById('file-input');
+                        // const file = fileInput.files[0];
 
-                        const options = {
-                            headers: {
-                                Authorization: "Bearer " + token,
-                            }
-                        };
-                        let url = `http://127.0.0.1:8000/storage/file?path=%2F`
+                        // // Get the authentication token from localStorage
+                        // const token = localStorage.getItem('authToken');
+                        // if (!token) {
+                        //     console.error('Authentication token not found.');
+                        //     return;
+                        // }
 
-                        fetch(url, options)
-                            .then(res => res.json())
-                            .then(data => console.log(data));
+                        // // Construct the headers with the token and Content-Type for file upload
+                        // const headers = new Headers();
+                        // headers.append('Authorization', `Bearer ${token}`);
+                        // headers.append('Content-Type', 'multipart/form-data'); // Set the correct Content-Type
+
+                        // // Create a FormData object to send the file
+                        // const formData = new FormData();
+                        // //formData.append('file', file);
+                        // formData.append('Authorization', "Bearer " + token);
+
+                        // const options = {
+                        //     headers: {
+                        //         // Authorization: "Bearer " + token,
+                        //         method: 'POST',
+                        //         body: formData
+                        //     }
+                        // };
+                        // let url = `http://127.0.0.1:8000/storage/file?path=%2F`
+
+                        // fetch(url, options)
+                        //     .then(res => res.json())
+                        //     .then(data => console.log(data));
 
                     }}>Submit</button>
                 </form>

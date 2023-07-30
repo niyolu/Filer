@@ -36,6 +36,20 @@ async def unicorn_exception_handler(request: Request, exc: PermissionError):
         detail=f"{exc}"
     )
 
+@app.exception_handler(ValueError)
+async def unicorn_exception_handler(request: Request, exc: PermissionError):
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"{exc}"
+    )
+
+@app.exception_handler(crud.DuplicateError)
+async def unicorn_exception_handler(request: Request, exc: PermissionError):
+    return HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"{exc}"
+    )
+
 LocalSession = Annotated[Session, Depends(database.get_db)]
 
 crud.init_admin(next(database.get_db()))

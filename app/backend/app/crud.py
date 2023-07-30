@@ -7,9 +7,12 @@ import functools
 import models, utils, auth, schemas
 
 
+class DuplicateError(Exception):
+    pass
+
+
 def flatten(list):
     return sum(list, [])
-
 
 def get_users(db: Session) -> models.User:
     return (
@@ -106,7 +109,7 @@ def create_user(
     max_objects_per_dir: int | None = None
 ):
     if get_user_by_username(db, username) is not None:
-        return
+        raise DuplicateError("User already exists")
     user = models.User(
         username=username, hashed_password=hashed_password,
         quota=quota, max_objects_per_dir=max_objects_per_dir
@@ -142,6 +145,9 @@ def create_storage_object(
     owner: models.User = get_user(db, user_id)
     
     obj_path = f"{path}/{object_name}"
+    
+    if get_storageobject_by_path(db, user_id, obj_path):
+        raise DuplicateError("Object already exists")
 
     if len(parent.children) >= owner.max_objects_per_dir:
         raise PermissionError("Exceeds max objects per directory limit.")
@@ -166,6 +172,8 @@ def create_storage_object(
     
     
 def create_group(db: Session, name: str):
+    if get_group_by_groupname(db, name):
+        return DuplicateError("Group already exists")
     group = models.Group(name=name)
     db.add(group)
     db.commit()
@@ -362,6 +370,8 @@ def get_all_objs_tree(db: Session, user_id: int):
 def add_user_to_group(db: Session, group_id: int, user_id: int):
     group: models.Group = get_group(db, group_id)
     user: models.User = get_user(db, user_id)
+    if user in group.members:
+        return DuplicateError("Membership already exists")
     group.members.append(user)
     db.commit()
     return group

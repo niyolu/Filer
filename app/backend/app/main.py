@@ -167,7 +167,7 @@ def read_my_groups(
     current_user: CurrentUser,
     db: LocalSession
 ):
-    return crud.get_group_by_username(current_user.username)
+    return crud.get_group_by_username(db, current_user.username)
 
 
 @router_groups.post("/", response_model=schemas.Group)
@@ -215,7 +215,7 @@ async def upload_object(
 
 
 @router_storage.post("/directory", response_model=schemas.DirectorySummary)
-async def download_object(
+async def create_directory(
     current_user: CurrentUser,
     db: LocalSession,
     path: str,
@@ -223,9 +223,8 @@ async def download_object(
 ):
     user: models.User = crud.get_user_by_username(db, current_user.username)
     
-    res = crud.create_storage_object(db, user.id, path, directory_name)
+    return crud.create_storage_object(db, user.id, path, directory_name)
     
-    return res
 
 
 @router_storage.delete("/", response_model=list[schemas.FileSummary | schemas.DirectorySummary])
@@ -245,7 +244,7 @@ async def delete_object(
     return deleted
 
 
-@router_storage.get("/download", response_class=BytesResponse)
+@router_storage.post("/download", response_class=BytesResponse)
 async def download_object(
     current_user: CurrentUser,
     db: LocalSession,

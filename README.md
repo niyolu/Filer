@@ -31,5 +31,9 @@
 
 ### Design
 
+##### Data Model
 ![Data Model](docs/model.png)
+
+##### REST API
+![UML](docs/api.png)
 

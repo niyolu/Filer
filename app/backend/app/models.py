@@ -44,7 +44,8 @@ class User(Base):
         return f"{self.__class__.__name__}({self.id}, {self. username} root={self.root.name if self.root else 'None'})"
     
     def __str__(self):
-        return f"{self:r} objects({self.owned_objects}=, {self.shared_objects}=) groups({self.group_memberships})"
+        return f"{self!r} objects({self.owned_objects}=, {self.shared_objects}=) groups({self.group_memberships})"
+        #return f"{self:r} objects({self.owned_objects}=, {self.shared_objects}=) groups({self.group_memberships})"
 
 
 class StorageObject(SerializableBase):
@@ -78,7 +79,7 @@ class StorageObject(SerializableBase):
         return f"{self.__class__.__name__}({self.id=} {self.name=} {self.path=} owner={self.owner:r})"
     
     def __str__(self) -> str:
-        return f"{self:r} parent = {self.parent:r}"
+        return f"{self!r} parent = {self.parent!r}"
         
 
     
@@ -120,7 +121,7 @@ class Directory(StorageObject):
         return super().__repr__.replace(super().__class__.__name__, self.__class__.__name__)
     
     def __str__(self) -> str:
-        return f"{self:r} children({','.join([repr(child) for child in self.children])})"
+        return f"{self!r} children({','.join([repr(child) for child in self.children])})"
 
 
 class Group(Base):

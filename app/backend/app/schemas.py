@@ -4,29 +4,32 @@ from typing import ForwardRef, Optional
 from pydantic import BaseModel
 from enum import Enum
 
-class User(BaseModel):
+class UserBase(BaseModel):
     username: str
     is_active: bool | None = None
     
-    quota: int
-    used: int
-    
     class Config:
         from_attributes = True
-    
+
+class User(UserBase):
+    quota: int
+    used: int
+
 
 class UserInDB(User):
     id: int
     hashed_password: str
     
 
-class UserCreate(User):
+class UserCreate(UserBase):
     password: str
     
 
 class Token(BaseModel):
     access_token: str
     token_type: str
+    quota: int | None = None
+    used: int | None = None
     
     
 class TokenData(BaseModel):

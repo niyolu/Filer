@@ -25,23 +25,19 @@ function getAuthToken() {
 //     console.error('Error:', error);
 //   }
 // }
-async function upload(formData, path, token, type) {
+
+
+
+async function upload(formData, path, headers) {
   try {
-    const request = new Request(`http://127.0.0.1:8000/storage/file?path=${path}`, {
+    const response = await fetch(`http://127.0.0.1:8000/storage/file?path=${path}`, {
       method: 'POST',
       body: formData,
+      headers: headers,
     });
-    
-    // Add the desired headers to the file part of the FormData
-    request.headers.set('Authorization', `Bearer ${token}`);
-    request.headers.set('Content-Type', type); // Or use file.type to get the actual Content-Type
-    
-    const response = await fetch(request);
-    
     if (!response.ok) {
       throw new Error('Failed to upload file.');
     }
-    
     const result = await response.json();
     console.log('Success:', result);
   } catch (error) {
@@ -99,15 +95,25 @@ function FolderNode({ folder }) {
       console.error('Authentication token not found.');
       return;
     }
-
+    
     const fileField = event.target.querySelector('input[type="file"]');
     const file = fileField.files[0];
 
-    const formData = new FormData();
-    formData.append('file', file, file.name, file.type);
+    const boundary = '---------------------------' + Date.now().toString(16);
 
-    const path = encodeURIComponent('/');
-    upload(formData, path, token);
+    const headers = new Headers();
+    headers.append('Authorization', `Bearer ${token}`);
+    headers.append('Content-Type', 'multipart/form-data; boundary=' + boundary);
+
+    const body = `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="file"; filename="${file.name}"\r\n` +
+      `Content-Type: ${file.type}\r\n\r\n` +
+      `${await file.text()}\r\n` +
+      `--${boundary}--`;
+
+    const path = 
+
+    upload(body, encodeURIComponent('/'), headers);
   };
 
   return (

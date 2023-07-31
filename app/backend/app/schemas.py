@@ -56,7 +56,7 @@ class StorageObjectBase(BaseModel):
         from_attributes = True
 
 class StorageObject(StorageObjectBase):
-    owner: User | None = None
+    owner: UserBase | None = None
     permission: Permission | None = None
     #parent: Directory | None # Optional[Directory_Ref] # "Optional[Directory]" 
 

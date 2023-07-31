@@ -339,7 +339,7 @@ def add_user_to_group(
     user: models.User = crud.get_user_by_username(db, current_user.username)
     group_id = crud.get_group_by_groupname(db, group_name).id
     obj_id = crud.get_storageobject_id_by_path(db, user.id, path)
-    return crud.share_storage_object_with_group(db, obj_id, group_id, permission)
+    crud.share_storage_object_with_group(db, obj_id, group_id, permission)
 
 
 @router_shared.post("/user")
@@ -353,7 +353,7 @@ def add_user_to_group(
     from_user: models.User = crud.get_user_by_username(db, current_user.username)
     to_user: models.User = crud.get_user_by_username(db, user_name)
     obj_id = crud.get_storageobject_id_by_path(db, from_user.id, path)
-    return crud.share_storage_object_with_user(db, obj_id, from_user.id, to_user.id, permission)
+    crud.share_storage_object_with_user(db, obj_id, from_user.id, to_user.id, permission)
 
 
 app.include_router(router_user)

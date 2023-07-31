@@ -16,6 +16,10 @@ import crud, models, schemas, auth, database
 
 models.Base.metadata.create_all(bind=database.engine)
 
+LocalSession = Annotated[Session, Depends(database.get_db)]
+
+crud.init_admin(next(database.get_db()))
+
 app = FastAPI()
 
 origins = [
@@ -30,6 +34,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+router_user = APIRouter(prefix="/users", tags=["users"])
+router_storage = APIRouter(prefix="/storage", tags=["storage"])
+router_groups = APIRouter(prefix="/groups", tags=["groups"])
+router_shared = APIRouter(prefix="/shares", tags=["shares"])
 
 
 @app.get("/logtest")
@@ -78,13 +87,8 @@ async def duplicate_exception_handler(request: Request, exc: crud.DuplicateError
 #         content={"message": f"Oopsie! {exc} did a happening."},
 #     )
 
-LocalSession = Annotated[Session, Depends(database.get_db)]
 
-crud.init_admin(next(database.get_db()))
 
-router_user = APIRouter(prefix="/users", tags=["users"])
-router_storage = APIRouter(prefix="/storage", tags=["storage"])
-router_groups = APIRouter(prefix="/groups", tags=["groups"])
 
 async def get_current_user(
     token: Annotated[str, Depends(auth.oauth2_scheme)],
@@ -323,19 +327,20 @@ def add_user_to_group(
     user_id = crud.get_user_by_username(db, user_name).id
     return crud.add_user_to_group(db, group_id, user_id)
 
-# @router_groups.patch("/join", response_model=schemas.Group)
-# def add_user_to_group(
-#     current_user: CurrentUser,
-#     db: LocalSession,
-#     group_name: str,
-#     user_name: str
-# ):
-#     group_id = crud.get_group_by_groupname(db, group_name).id
-#     user_id = crud.get_user_by_username(db, user_name).id
-#     return crud.add_user_to_group(db, group_id, user_id)
+
+@router_shared.post("/group")
+def add_user_to_group(
+    current_user: CurrentUser,
+    db: LocalSession,
+    group_name: str,
+    path
+):
+    group_id = crud.get_group_by_groupname(db, group_name).id
+    return crud.share_storage_object_with_group(db, )
 
 
 app.include_router(router_user)
 app.include_router(router_storage)
 app.include_router(router_groups)
+app.include_router(router_shared)
 

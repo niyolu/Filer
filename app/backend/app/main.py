@@ -68,15 +68,15 @@ async def duplicate_exception_handler(request: Request, exc: crud.DuplicateError
         content={"message": f"Oopsie! {exc} did a happening."},
     )
     
-@app.exception_handler(Exception)
-async def general_exception_handler(request: Request, exc: Exception):
-    if isinstance(exc, KeyboardInterrupt):
-        raise exc
-    logger.warn(str(exc))
-    return JSONResponse(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        content={"message": f"Oopsie! {exc} did a happening."},
-    )
+# @app.exception_handler(Exception)
+# async def general_exception_handler(request: Request, exc: Exception):
+#     if isinstance(exc, KeyboardInterrupt):
+#         raise exc
+#     logger.warn(str(exc))
+#     return JSONResponse(
+#         status_code=status.HTTP_400_BAD_REQUEST,
+#         content={"message": f"Oopsie! {exc} did a happening."},
+#     )
 
 LocalSession = Annotated[Session, Depends(database.get_db)]
 
@@ -255,7 +255,7 @@ class BytesResponse(Response):
 
 
 @router_storage.post("/file", response_model=schemas.FileSummary)
-async def upload_object(
+async def upload_file(
     current_user: CurrentUser,
     db: LocalSession,
     file: UploadFile,
@@ -266,7 +266,12 @@ async def upload_object(
     filename = file.filename
     content = await file.read()
     
+    logger.debug(f"Received upload {filename} ({str(len(content) / 1024**2)} kiB) target={path}")
+    
     res = crud.create_storage_object(db, user.id, path, filename, content=content)
+    
+    if not res:
+        logger.debug("obj" + filename + "already exists")
     
     return res
 

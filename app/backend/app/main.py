@@ -266,7 +266,7 @@ async def upload_file(
     filename = file.filename
     content = await file.read()
     
-    logger.debug(f"Received upload {filename} ({str(len(content) / 1024**2)} kiB) target={path}")
+    logger.debug(f"Received upload {filename} ({str(len(content) / 1024)} kiB) target={path}")
     
     res = crud.create_storage_object(db, user.id, path, filename, content=content)
     
@@ -338,3 +338,4 @@ def add_user_to_group(
 app.include_router(router_user)
 app.include_router(router_storage)
 app.include_router(router_groups)
+

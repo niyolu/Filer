@@ -147,8 +147,12 @@ def create_storage_object(
     
     obj_path = f"{path}/{object_name}"
     
-    if get_storageobject_by_path(db, user_id, obj_path):
-        raise DuplicateError(f"Object {obj_path} already exists")
+    old_in_db = get_storageobject_by_path(db, user_id, obj_path)
+    
+    if old_in_db:
+        raise DuplicateError(f"Object {schemas.File.model_validate(old_in_db)} already exists")
+    
+    logger.debug(f"{old_in_db} doesnt exist yet")
 
     if len(parent.children) >= owner.max_objects_per_dir:
         raise PermissionError(f"Exceeds max objects per directory limit ({parent.children}/{owner.max_objects_per_dir}).")

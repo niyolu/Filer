@@ -37,7 +37,7 @@ export function FileDownloadButton({ fileUrl, fileName, path }) {
 export function RemoveItem({ fileUrl, fileName, path }) {
     const handleDownload = () => {
         let token = getAuthToken()
-        fetch((fileUrl + `?path=${"/Happy Pants Guy__an__r2x.png"}`), {
+        fetch((fileUrl + `?path=${path}`), {
             method: 'DELETE',
             headers: {
                 accept: "/",

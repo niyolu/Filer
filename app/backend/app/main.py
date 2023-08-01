@@ -62,7 +62,6 @@ async def permission_exception_handler(request: Request, exc: PermissionError):
 
 @app.exception_handler(ValueError)
 async def valueerror_exception_handler(request: Request, exc: ValueError):
-    print("help")
     logger.warn(str(exc))
     return JSONResponse(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -269,6 +268,7 @@ async def upload_file(
 
     filename = file.filename
     content = await file.read()
+    # content = file.file.read()
     
     logger.debug(f"Received upload {filename} ({str(len(content) / 1024)} kiB) target={path}")
     

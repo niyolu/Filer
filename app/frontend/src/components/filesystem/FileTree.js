@@ -160,7 +160,7 @@ function FileNode({ file }) {
 
         <h5>Permissions:</h5>
 
-        <RemoveItem fileUrl={`http://127.0.0.1:8000/storage`} fileName={file.name} path={"/"} />
+        <RemoveItem fileUrl={`http://127.0.0.1:8000/storage`} fileName={file.name} path={file.path} />
         <button>Share File</button>
         <FileDownloadButton fileUrl={`http://127.0.0.1:8000/storage/download`} fileName={file.name} path={file.path} />
       </Modal>

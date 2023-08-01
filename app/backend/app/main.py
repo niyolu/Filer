@@ -174,7 +174,7 @@ def read_users(
     return crud.get_users(db)
 
 
-@router_user.post("/", response_model=schemas.User)
+@router_user.post("/", response_model=tuple[schemas.User, str])
 def create_user(
     user: schemas.UserCreate,
     db: LocalSession
@@ -184,7 +184,8 @@ def create_user(
     if not db_user:
         logger.warn("Incorrect username or password Invalid action 400 BAD REQUEST")
         raise Exception("User already registered")
-    return db_user
+    access_token = auth.create_access_token(data={"sub": db_user.username})
+    return db_user, access_token
 
 
 @router_user.delete("/", response_model=schemas.User)

@@ -41,7 +41,7 @@ class User(Base):
     shared_objects = relationship("StorageObject", secondary="storage_share", back_populates="shared_with_users")
     
     def __repr__(self):
-        return f"{self.__class__.__name__}({self.id}, {self. username} root={self.root.name if self.root else 'None'})"
+        return f"{self.__class__.__name__}({self.id}, {self.username!r} root={self.root.name if self.root else 'None'!r})"
     
     def __str__(self):
         return f"{self!r} objects({self.owned_objects}=, {self.shared_objects}=) groups({self.group_memberships})"

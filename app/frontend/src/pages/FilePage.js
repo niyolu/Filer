@@ -113,6 +113,7 @@ const FilePage = () => {
                 <button onClick={handleSubmit}>Submit</button>
 
             </Modal>
+            <FileTree data={data.dirData.userData.owned_objects} />
             <FileTree data={testData} />
             
             

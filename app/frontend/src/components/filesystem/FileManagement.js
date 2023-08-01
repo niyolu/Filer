@@ -1,14 +1,17 @@
 import { getAuthToken } from "../../util/auth";
 
 export function FileDownloadButton({ fileUrl, fileName, path }) {
+    console.log(path)
+
     const handleDownload = () => {
         let token = getAuthToken()
-        fetch((fileUrl + `?path=${"/Happy Pants Guy__an__r2x.png"}`), {
+        fetch((fileUrl + `?path=${path}`), {
             method: 'POST',
             headers: {
                 accept: "/",
                 Authorization: "Bearer " + token
-            }
+            },
+            body: null
         })
         .then((response) => response.blob())
         .then((blob) => {
@@ -17,6 +20,7 @@ export function FileDownloadButton({ fileUrl, fileName, path }) {
             console.log(url)
             const link = document.createElement('a');
             link.href = url;
+            console.log(url)
             link.setAttribute('download', fileName);
             document.body.appendChild(link);
             link.click();

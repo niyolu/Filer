@@ -9,24 +9,6 @@ function getAuthToken() {
   return localStorage.getItem('mca_token');
 }
 
-// Async function to upload the file
-// async function upload(formData, path) {
-//   try {
-//     const response = await fetch(`http://127.0.0.1:8000/storage/file?path=${path}`, {
-//       method: 'POST',
-//       body: formData,
-//     });
-//     if (!response.ok) {
-//       throw new Error('Failed to upload file.');
-//     }
-//     const result = await response.json();
-//     console.log('Success:', result);
-//   } catch (error) {
-//     console.error('Error:', error);
-//   }
-// }
-
-
 
 async function upload(formData, path, headers) {
   try {
@@ -105,15 +87,14 @@ function FolderNode({ folder }) {
     headers.append('Authorization', `Bearer ${token}`);
     headers.append('Content-Type', 'multipart/form-data; boundary=' + boundary);
 
-    const body = `--${boundary}\r\n` +
+    /*const body = `--${boundary}\r\n` +
       `Content-Disposition: form-data; name="file"; filename="${file.name}"\r\n` +
       `Content-Type: ${file.type}\r\n\r\n` +
       `${await file.text()}\r\n` +
-      `--${boundary}--`;
+      `--${boundary}--`;*/
+    const body = `--${boundary}\r\nContent-Type: ${file.type}\r\n\r\n${await file.text()}--${boundary}--`
 
-    const path = 
-
-    upload(body, encodeURIComponent('/'), headers);
+    upload(body, encodeURIComponent(folder.path), headers);
   };
 
   return (
@@ -185,7 +166,7 @@ function FileNode({ file }) {
 
         <RemoveItem fileUrl={`http://127.0.0.1:8000/storage`} fileName={file.name} path={"/"} />
         <button>Share File</button>
-        <FileDownloadButton fileUrl={`http://127.0.0.1:8000/storage/download`} fileName={file.name} path={"/"} />
+        <FileDownloadButton fileUrl={`http://127.0.0.1:8000/storage/download`} fileName={file.name} path={file.path} />
       </Modal>
     </div>
   );
@@ -193,6 +174,7 @@ function FileNode({ file }) {
 
 // FileTree component
 function FileTree({ data }) {
+  console.log(data)
   return (
     <div>
       <h1>File Tree</h1>

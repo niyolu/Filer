@@ -51,6 +51,11 @@ async def read_root():
     return {"message": "Hello, World!"}
 
 
+@app.get("/")
+def healthcheck():
+    return "running"
+
+
 @app.exception_handler(PermissionError)
 async def permission_exception_handler(request: Request, exc: PermissionError):
     logger.warn(str(exc))
@@ -76,17 +81,15 @@ async def duplicate_exception_handler(request: Request, exc: crud.DuplicateError
         content={"message": f"Oopsie! {exc} did a happening."},
     )
     
-# @app.exception_handler(Exception)
-# async def general_exception_handler(request: Request, exc: Exception):
-#     if isinstance(exc, KeyboardInterrupt):
-#         raise exc
-#     logger.warn(str(exc))
-#     return JSONResponse(
-#         status_code=status.HTTP_400_BAD_REQUEST,
-#         content={"message": f"Oopsie! {exc} did a happening."},
-#     )
-
-
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    if isinstance(exc, KeyboardInterrupt):
+        raise exc
+    logger.warn(str(exc))
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={"message": f"Oopsie! {exc} did a happening."},
+    )
 
 
 async def get_current_user(
@@ -164,7 +167,7 @@ async def read_users_me(
     return current_user
 
 
-@router_user.get("/", response_model=list[schemas.User])
+@router_user.get("/", response_model=list[schemas.UserBase])
 def read_users(
     db: LocalSession
 ):
@@ -181,6 +184,15 @@ def create_user(
     if not db_user:
         logger.warn("Incorrect username or password Invalid action 400 BAD REQUEST")
         raise Exception("User already registered")
+    return db_user
+
+
+@router_user.delete("/", response_model=schemas.User)
+def delete_user(
+    current_user: CurrentUser,
+    db: LocalSession
+):
+    db_user = crud.delete_user(db, current_user.id)
     return db_user
 
 
@@ -201,9 +213,14 @@ def activate_user(
     return crud.change_active_status_for_user_by_username(db, username, True)
 
 
-@app.get("/")
-def healthcheck():
-    return "running"
+@router_user.post("/quota", response_model=schemas.User)
+def change_quota(
+    admin: Admin,
+    username: str,
+    new_quota: int,
+    db: LocalSession
+):    
+    return crud.change_user_quota(db, username, new_quota)
 
 
 @router_groups.get("/groups", response_model=list[schemas.Group])
@@ -230,41 +247,35 @@ def create_group(
     return crud.create_group(db, group_name)
 
 
-@router_groups.post("/members", response_model=list[schemas.User])
-def create_group(
-    current_user: CurrentUser,
+@router_groups.patch("/join", response_model=schemas.Group)
+def add_user_to_group(
+    admin: Admin,
     db: LocalSession,
-    group_name: str
+    group_name: str,
+    user_name: str
 ):
-    return crud.create_group(db, group_name)
+    group_id = crud.get_group_by_groupname(db, group_name).id
+    user_id = crud.get_user_by_username(db, user_name).id
+    return crud.add_user_to_group(db, group_id, user_id)
 
 
-@router_storage.get("/", response_model=schemas.FileOverview)
+@router_storage.get("/", response_model=schemas.StorageOverview)
 def read_files(
     current_user: CurrentUser,
     db: LocalSession
 ):
-    user: models.User = crud.get_user_by_username(db, current_user.username)
+    user = crud.get_user_by_username(db, current_user.username)
     return crud.get_all_objs_tree(db, user.id)
 
 
-class BytesResponse(Response):
-    def __init__(self, content: bytes, filename: str = None, status_code: int = 200):
-        media_type = "application/octet-stream"
-        headers = {}
-        if filename:
-            headers["Content-Disposition"] = f'attachment; filename="{filename}"'
-        super().__init__(content=content, media_type=media_type, headers=headers, status_code=status_code)
-
-
-@router_storage.post("/file", response_model=schemas.FileSummary)
+@router_storage.post("/file", response_model=schemas.FileCreate)
 async def upload_file(
     current_user: CurrentUser,
     db: LocalSession,
     file: UploadFile,
     path: str
 ):
-    user: models.User = crud.get_user_by_username(db, current_user.username)
+    user= crud.get_user_by_username(db, current_user.username)
 
     filename = file.filename
     content = await file.read()
@@ -280,7 +291,7 @@ async def upload_file(
     return res
 
 
-@router_storage.post("/directory", response_model=schemas.DirectorySummary)
+@router_storage.post("/directory", response_model=schemas.DirectoryBase)
 async def create_directory(
     current_user: CurrentUser,
     db: LocalSession,
@@ -291,7 +302,7 @@ async def create_directory(
     return crud.create_storage_object(db, user.id, directory.path, directory.name)
 
 
-@router_storage.delete("/", response_model=list[schemas.FileSummary | schemas.DirectorySummary])
+@router_storage.delete("/", response_model=list[schemas.OwnedFile | schemas.OwnedDirectory])
 async def delete_object(
     current_user: CurrentUser,
     db: LocalSession,
@@ -299,6 +310,15 @@ async def delete_object(
 ):
     user = crud.get_user_by_username(db, current_user.username)
     return crud.delete_object_by_path(db, user.id, path)
+
+
+class BytesResponse(Response):
+    def __init__(self, content: bytes, filename: str = None, status_code: int = 200):
+        media_type = "application/octet-stream"
+        headers = {}
+        if filename:
+            headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+        super().__init__(content=content, media_type=media_type, headers=headers, status_code=status_code)
 
 
 @router_storage.post("/download", response_class=BytesResponse)
@@ -316,48 +336,35 @@ async def download_object(
     return BytesResponse(content=file.content, filename=file.name)
 
 
-@router_groups.patch("/join", response_model=schemas.Group)
-def add_user_to_group(
-    admin: Admin,
-    db: LocalSession,
-    group_name: str,
-    user_name: str
-):
-    group_id = crud.get_group_by_groupname(db, group_name).id
-    user_id = crud.get_user_by_username(db, user_name).id
-    return crud.add_user_to_group(db, group_id, user_id)
-
-
-@router_shared.post("/group")
-def add_user_to_group(
-    current_user: CurrentUser,
-    db: LocalSession,
-    group_name: str,
-    path: str,
-    permission: schemas.Permission
-):
-    user: models.User = crud.get_user_by_username(db, current_user.username)
-    group_id = crud.get_group_by_groupname(db, group_name).id
-    obj_id = crud.get_storageobject_id_by_path(db, user.id, path)
-    crud.share_storage_object_with_group(db, obj_id, group_id, permission)
-
-
 @router_shared.post("/user")
-def add_user_to_group(
+def share_with_user(
     current_user: CurrentUser,
     db: LocalSession,
     user_name: str,
     path: str,
     permission: schemas.Permission
 ):
-    from_user: models.User = crud.get_user_by_username(db, current_user.username)
-    to_user: models.User = crud.get_user_by_username(db, user_name)
+    from_user= crud.get_user_by_username(db, current_user.username)
+    to_user = crud.get_user_by_username(db, user_name)
     obj_id = crud.get_storageobject_id_by_path(db, from_user.id, path)
-    crud.share_storage_object_with_user(db, obj_id, from_user.id, to_user.id, permission)
+    crud.share_storage_object_with_user(db, obj_id, from_user.id, to_user.id, permission.value)
+    
+    
+@router_shared.post("/group")
+def share_with_group(
+    current_user: CurrentUser,
+    db: LocalSession,
+    group_name: str,
+    path: str,
+    permission: schemas.Permission
+):
+    user = crud.get_user_by_username(db, current_user.username)
+    group = crud.get_group_by_groupname(db, group_name)
+    obj = crud.get_storageobject_id_by_path(db, user.id, path)
+    crud.share_storage_object_with_group(db, obj.id, group.id, permission.value)
 
 
 app.include_router(router_user)
 app.include_router(router_storage)
 app.include_router(router_groups)
 app.include_router(router_shared)
-

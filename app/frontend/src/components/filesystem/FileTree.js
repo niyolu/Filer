@@ -9,23 +9,31 @@ function getAuthToken() {
   return localStorage.getItem('mca_token');
 }
 
+async function uploadFile(file, path, token) {
+  const formData = new FormData();
+  formData.append('file', file); // Just append the file directly
 
-async function upload(formData, path, headers) {
+  const headers = new Headers();
+  headers.append('Authorization', `Bearer ${token}`);
+
   try {
-    const response = await fetch(`http://127.0.0.1:8000/storage/file?path=${path}`, {
+    const response = await fetch(`http://127.0.0.1:8000/storage/file?path=${encodeURIComponent(path)}`, {
       method: 'POST',
       body: formData,
       headers: headers,
     });
+
     if (!response.ok) {
       throw new Error('Failed to upload file.');
     }
+
     const result = await response.json();
     console.log('Success:', result);
   } catch (error) {
     console.error('Error:', error);
   }
 }
+
 
 // FolderNode component
 function FolderNode({ folder }) {
@@ -80,21 +88,9 @@ function FolderNode({ folder }) {
     
     const fileField = event.target.querySelector('input[type="file"]');
     const file = fileField.files[0];
+    const path = folder.path;
 
-    const boundary = '---------------------------' + Date.now().toString(16);
-
-    const headers = new Headers();
-    headers.append('Authorization', `Bearer ${token}`);
-    headers.append('Content-Type', 'multipart/form-data; boundary=' + boundary);
-
-    /*const body = `--${boundary}\r\n` +
-      `Content-Disposition: form-data; name="file"; filename="${file.name}"\r\n` +
-      `Content-Type: ${file.type}\r\n\r\n` +
-      `${await file.text()}\r\n` +
-      `--${boundary}--`;*/
-    const body = `--${boundary}\r\nContent-Type: ${file.type}\r\n\r\n${await file.text()}--${boundary}--`
-
-    upload(body, encodeURIComponent(folder.path), headers);
+    uploadFile(file, path, token);
   };
 
   return (

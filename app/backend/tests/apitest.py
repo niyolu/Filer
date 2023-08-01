@@ -70,7 +70,7 @@ def test_upload_file():
     
 # Test sharing with user
 def test_share_with_user():
-    # Create a user1
+    # Create user1
     response = client.post("/users/", json={"username": "user1", "password": "password1"})
     assert response.status_code == 200
     user1 = response.json()[0]
@@ -81,7 +81,14 @@ def test_share_with_user():
     response = client.post("/storage/file", headers=headers1, files={"file": ("test.txt", "Hello, User1!")}, data={"path": "/user1-files/"})
     assert response.status_code == 200
 
+    # Create user2
+    response = client.post("/users/", json={"username": "user2", "password": "password2"})
+    assert response.status_code == 200
+    user2 = response.json()[0]
+    token2 = response.json()[1]
+
     # Share the file with user2
+    headers2 = {"Authorization": f"Bearer {token2}"}
     response = client.post("/shares/user", headers=headers1, json={"user_name": "user2", "path": "/user1-files/test.txt", "permission": "R"})
     assert response.status_code == 200
 
@@ -89,6 +96,7 @@ def test_share_with_user():
     response = client.get("/storage/", headers=headers2)
     assert response.status_code == 200
     assert "/user1-files/test.txt" in response.json()["owned_objects"]["children"]
+
 
 # Test sharing with group
 def test_share_with_group():
@@ -127,6 +135,7 @@ def test_share_with_group():
     response = client.get("/storage/", headers=headers2)
     assert response.status_code == 200
     assert "/user1-files/test.txt" in response.json()["owned_objects"]["children"]
+
 
 
 # Add more test cases for other endpoints as needed.

@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-import crud, database, config, models, schemas
+import crud, database, config, models, schemas, logger
 #from app.models import User, Directory, File, StorageObject
 
 import pytest
@@ -46,23 +46,23 @@ def setup_test_data(db_session):
         
     db_session.commit()
     
-def comp_obj_non_nested(x,y,own=True,id=True,content=True):
+def comp_obj_non_nested(x,y,own=True,id=True,content=True, debug=False):
     valid = x.name == y.name and x.path == y.path
-    if not valid:
-        print("id or path bad")
+    if debug and not valid:
+        print("name or path bad")
     if id and all(isinstance(o, models.Base) for o in (x, y)):
         r = x.id == y.id
-        if not r:
+        if debug and  not r:
             print("id bad")
         valid &= r
-    if own and all(isinstance(o, (models.StorageObject, schemas.StorageObject)) for o in (x, y)):
+    if own and all(isinstance(o, (models.StorageObject, schemas.SharedStorageObject)) for o in (x, y)):
         r = x.owner==y.owner
-        if not r:
+        if debug and  not r:
             print("owner bad")
         valid &= r
-    if content and all(isinstance(o, models.File) for o in (x, y)):
+    if content and all(isinstance(o, (models.File, schemas.FullFile)) for o in (x, y)):
         r = x.content == y.content
-        if not r:
+        if debug and  not r:
             print("content bad")
     return valid
     
@@ -175,7 +175,6 @@ def test_rename(db_session):
     crud.rename_storageobject(db_session, dir1.id, "dir1changed")
     assert file1.path == "/dir1changed/file1.txt"
     assert file2.path == "/dir1changed/dir2/file2.txt"
-    
 
 def test_delete_subobject_by_path(db_session):
     user = create_test_user(db_session)
@@ -229,6 +228,7 @@ def test_get_all_objs_tree(db_session):
     
     owned_file1 = crud.create_storage_object(db_session, receivee.id, receivee.root.path, "file1.txt", content=b"File content1")
     owned_dir1 = crud.create_storage_object(db_session, receivee.id, receivee.root.path, "dir1")
+    
     owned_file2 = crud.create_storage_object(db_session, receivee.id, owned_dir1.path, "file2.txt", content=b"File content2")
     owned_dir2 = crud.create_storage_object(db_session, receivee.id, owned_dir1.path,  "dir2")
     owned_file3 = crud.create_storage_object(db_session, receivee.id, owned_dir2.path, "file3.txt", content=b"File content3")
@@ -248,13 +248,44 @@ def test_get_all_objs_tree(db_session):
     midway_owned = midway_objs.owned_objects
     midway_shared = midway_objs.shared_objects
     midway_group_shared = midway_objs.group_shared_objects
-    print(owned_file1)
-    print(midway_objs)
+    # print(owned_file1)
+    # print(midway_objs)
     
-    midway_owned = crud.get_subelements_schema(midway_owned)
-    for o in midway_owned:
-        assert any(comp_obj_non_nested())
-        
+    # import collections
+    
+    # def get_subelements(elements: list[models.StorageObject]):
+    #     working_set = collections.deque(elements if isinstance(elements, list) else [elements])
+    #     print(working_set)
+    #     subelements = []
+    #     while working_set:
+    #         element = working_set.popleft()
+    #         subelements.append(element)
+    #         print(element)
+    #         match(element):
+    #             case models.Directory(children=children):
+    #                 working_set.extend(children)
+    #     return subelements
+    
+    #midway_owned = 
+    
+    # print(midway_owned)
+    # print(midway_owned.children)
+    midway_owned_flat = crud.get_subelements(midway_owned)
+    owned = crud.get_subelements([owned_file1, owned_file2, owned_file3, owned_dir1, owned_dir2])
+    #print(f"{midway_owned=}")
+    print(f"{midway_owned_flat=}")
+    print(f"{owned=}")
+    
+    for to_be_owned in midway_owned_flat:
+        found = False
+        for o in owned:
+            if comp_obj_non_nested(to_be_owned, o, True):
+                found = True
+        # if not found:
+        #     print(f"{[owned_file1, owned_file2, owned_file3, owned_dir1, owned_dir2]}=")
+        #     print(f"{to_be_owned}=")
+        assert found, to_be_owned
+    
 
     assert any([comp_obj_non_nested(owned_file1, c) for c in midway_owned.children])
     assert any([comp_obj_non_nested(owned_dir1, c) for c in midway_owned.children])
@@ -262,7 +293,7 @@ def test_get_all_objs_tree(db_session):
     assert any([comp_obj_non_nested(owned_dir2, cc) for cc in [c.children for c in midway_owned.children if isinstance(c, models.Directory)]])
     assert any([comp_obj_non_nested(owned_file3, ccc) for ccc in [cc.children for cc in [c.children for c in midway_owned.children if isinstance(c, models.Directory)] if isinstance(cc, models.Directory)]])
 
-    
+   
     
 if __name__ == "__main__":
     assert False

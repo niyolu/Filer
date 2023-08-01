@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from logger import logger
 
 
 class Settings(BaseSettings):
@@ -32,4 +33,4 @@ def get_settings():
 
 if __name__ == "__main__":
     settings = Settings()
-    print(settings)
+    logger.debug(settings)

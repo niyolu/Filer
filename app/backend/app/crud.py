@@ -152,7 +152,7 @@ def create_storage_object(
     if old_in_db:
         raise DuplicateError(f"Object {schemas.File.model_validate(old_in_db)} already exists")
     
-    logger.debug(f"{old_in_db} doesnt exist yet")
+    # logger.debug(f"{old_in_db} doesnt exist yet")
 
     if len(parent.children) >= owner.max_objects_per_dir:
         raise PermissionError(f"Exceeds max objects per directory limit ({parent.children}/{owner.max_objects_per_dir}).")
@@ -285,9 +285,11 @@ def share_storage_object_with_user(
 def share_storage_object_with_group(db: Session, obj_id: int, group_id, permission: str):
     obj = get_storageobject(db, obj_id)
     owner = obj.owner
-    group = get_group(db, group_id)
+    group: models.Group = get_group(db, group_id)
     if not owner in group.members:
         raise PermissionError("You can only share with groups you are part of.")
+    if any (obj.path == g_obj.path for g_obj in group.shared_objects):
+        raise DuplicateError(f"File with path={obj.path} already shared with {group.name}")
     
     if not db.query(models.GroupShare).filter_by(group_id=group_id, obj_id=obj_id).first():
         share = models.GroupShare(group_id=group_id, obj_id=obj_id, permission=permission)
@@ -332,11 +334,13 @@ def delete_user(db: Session, user_id: int):
 
 # TODO: test
 def get_subelements(elements: list[models.StorageObject]):
-    working_set = collections.deque(elements)
+    working_set = collections.deque(elements if isinstance(elements, list) else [elements])
+    #logger.debug(working_set)
     subelements = []
     while working_set:
         element = working_set.popleft()
         subelements.append(element)
+        #logger.debug(element)
         match(element):
             case models.Directory(children=children):
                 working_set.extend(children)

@@ -15,7 +15,6 @@ class User(UserBase):
     quota: int
     used: int
 
-
 class UserInDB(User):
     id: int
     hashed_password: str
@@ -23,7 +22,7 @@ class UserInDB(User):
 
 class UserCreate(UserBase):
     password: str
-    
+
 
 class Token(BaseModel):
     access_token: str
@@ -39,14 +38,20 @@ class TokenData(BaseModel):
 class Permission(str, Enum):
     R = "R"
     RW = "RW"
-
-
-Directory_Ref = ForwardRef("Directory")
+    
 
 class StorageObjectType(str, Enum):
-    R = "R"
-    RW = "RW"
+    dir = "dir"
+    file = "file"
 
+    
+class StorageDetails(BaseModel):
+    owner: UserBase
+    permission: Permission
+    
+    class Config:
+        from_attributes = True
+        
 
 class StorageObjectBase(BaseModel):
     name: str
@@ -54,57 +59,66 @@ class StorageObjectBase(BaseModel):
     
     class Config:
         from_attributes = True
+        
 
-class StorageObject(StorageObjectBase):
-    owner: UserBase | None = None
-    permission: Permission | None = None
-    #parent: Directory | None # Optional[Directory_Ref] # "Optional[Directory]" 
-
-
-class FileSummary(StorageObjectBase):
-    filetype: str | None = None
+class FileBase(StorageObjectBase):
+    filetype: str
 
 
-class DirectorySummary(StorageObjectBase):
+class DirectoryBase(StorageObjectBase):
     pass
 
 
-class DirectorySummaryChildren(DirectorySummary):
-    children: list[DirectorySummaryChildren | FileSummary]
+class FileCreate(FileBase):
+    pass
+
+
+class DirectoryCreate(DirectoryBase):
+    pass
+
+
+class OwnedFile(FileBase):
+    pass
+
+
+class OwnedDirectory(DirectoryBase):
+    children: list[OwnedFile | OwnedDirectory]
+
+
+class SharedStorageObject(StorageObjectBase, StorageDetails):
+    pass
+
+
+class SharedFile(SharedStorageObject):
+    filetype: str
     
 
-class File(StorageObject):
-    filetype: str | None = None
-    #content: bytes
+class SharedDirectory(SharedStorageObject):
+    children: list[SharedFile | SharedDirectory] = []
+    
+    
+class IterFile(SharedStorageObject):
+    filetype: str
+    
+
+class IterDirectory(SharedStorageObject):
+    pass
 
 
-class Directory(StorageObject):
-    children: list[File | Directory]
-
-
-class StorageObjectCreate(BaseModel):
-    path: str
-    name: str
-
-
-class FileCreate(StorageObjectCreate):
+class StorageOverview(BaseModel):
+    owned_objects: OwnedDirectory
+    shared_objects: dict[str, list[SharedFile | SharedDirectory]] | None = None
+    group_shared_objects: dict[str, list[SharedFile | SharedDirectory]] | None = None
+    
+    
+class FullFile(SharedStorageObject):
     content: bytes
-
-    
-class FileOverview(BaseModel):
-    owned_objects: DirectorySummaryChildren
-    shared_objects: list[Directory | File]
-    group_shared_objects: dict[str, list[Directory | File]]
-
-
-class DirectoryCreate(StorageObjectCreate):
-    pass
 
 
 class Group(BaseModel):
     name: str
-    members: list[User]
+    members: list[UserBase]
 
 
 class GroupWithShare(Group):
-    shared: list[File | Directory] | None
+    shared: list[FileBase | DirectoryBase] | None

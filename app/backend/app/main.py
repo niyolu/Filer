@@ -361,7 +361,7 @@ def share_with_group(
     user = crud.get_user_by_username(db, current_user.username)
     group = crud.get_group_by_groupname(db, group_name)
     obj_id = crud.get_storageobject_id_by_path(db, user.id, path)
-    crud.share_storage_object_with_group(db, obj.id, group.id, permission.value)
+    crud.share_storage_object_with_group(db, obj_id, group.id, permission.value)
 
 
 app.include_router(router_user)

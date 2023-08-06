@@ -193,7 +193,8 @@ def delete_user(
     current_user: CurrentUser,
     db: LocalSession
 ):
-    db_user = crud.delete_user(db, current_user.id)
+    user = crud.get_user_by_username(db, current_user.username)
+    db_user = crud.delete_user(db, user.id)
     return db_user
 
 

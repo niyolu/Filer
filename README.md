@@ -23,10 +23,11 @@
 
 ### Tests
 
-##### Crud
+##### Backend
 1. navigate to `app/backend/tests`
 2. run `docker-compose up`
 3. run `pytest .\crudtest.py`
+4. run `pytest .\apitest.py`
 
 
 ### Design

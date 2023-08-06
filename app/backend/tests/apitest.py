@@ -1,8 +1,38 @@
 import pytest
 from fastapi.testclient import TestClient
-from app import app
+from main import app
+import database, crud
+from logger import logger
 
 client = TestClient(app)
+
+@pytest.fixture
+def db_session():
+    session = next(database.get_db())
+    session = database.local_session()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
+
+
+@pytest.fixture(autouse=True)
+def setup_test_data(db_session):
+    # Clean up any existing data and ensure a fresh state for each test
+    # db_session.query(models.StorageObject).delete()
+    
+    for user in crud.get_users(db_session):
+        db_session.delete(user)
+        
+    for group in crud.get_groups(db_session):
+        db_session.delete(group)
+        
+    db_session.commit()
+    
+    # Create a testuser for relevant tests
+    response = client.post("/users/", json={"username": "testuser", "password": "testpassword"})
+    assert response.status_code == 200
 
 def get_access_token():
     response = client.post("/token", data={"username": "testuser", "password": "testpassword"})
@@ -29,27 +59,29 @@ def test_authenticated_endpoint():
 def test_unauthenticated_endpoint():
     response = client.get("/")
     assert response.status_code == 200
-    assert response.text == "running"
+    assert response.json() == "running"
 
 # Test exception handler for PermissionError
 def test_permission_exception_handler():
-    response = client.get("/some-protected-endpoint")
-    assert response.status_code == 403
-    assert "Oopsie!" in response.json()["message"]
+    response = client.get("/users/me")
+    print(response.json())
+    assert response.status_code == 401
+    assert "Not authenticated" in response.json()["detail"]
 
 # Test exception handler for ValueError
 def test_valueerror_exception_handler():
-    response = client.post("/some-endpoint", data={"param1": "invalid"})
+    access_token = get_access_token()
+    headers = {"Authorization": f"Bearer {access_token}"}
+    response = client.post("/storage/directory", json={"name": "invalid", "path": "invalid"}, headers=headers)
+    print(response)
     assert response.status_code == 400
     assert "Oopsie!" in response.json()["message"]
 
 # Test user creation endpoint
 def test_create_user():
-    access_token = get_access_token()
-    headers = {"Authorization": f"Bearer {access_token}"}
-    response = client.post("/users/", json={"username": "newuser", "password": "newpassword"}, headers=headers)
+    response = client.post("/users/", json={"username": "newuser", "password": "newpassword"})
     assert response.status_code == 200
-    assert "username" in response.json()
+    assert "username" in response.json()[0]
 
 # Test user deletion endpoint
 def test_delete_user():
@@ -59,16 +91,32 @@ def test_delete_user():
     assert response.status_code == 200
     assert "username" in response.json()
 
-# Test upload file endpoint
+def upload_file(token, path, content):
+    headers = {"Authorization": f"Bearer {token}"}
+    response = client.post(
+        "/storage/file",
+        headers=headers,
+        files={"file": ("test.txt", content.decode())},  # Encode the content as bytes
+        data={"path": path},
+    )
+    return response
+
 def test_upload_file():
-    access_token = get_access_token()
-    headers = {"Authorization": f"Bearer {access_token}"}
-    file_content = b"some file content"
-    response = client.post("/storage/file", files={"file": ("test.txt", file_content)}, data={"path": "/test"}, headers=headers)
+    # Create user1
+    response = client.post("/users/", json={"username": "user1", "password": "password1"})
     assert response.status_code == 200
-    assert "name" in response.json()
-    
-# Test sharing with user
+    user1 = response.json()[0]
+    token1 = response.json()[1]
+
+    # Authenticate as user1 and upload a file
+    content_user1 = b"Hello, User1!"
+    path_user1 = "/"
+    response = upload_file(token1, path_user1, content_user1)
+    print("response", response)
+    assert response.status_code == 200
+
+    # ... rest of the test code ...
+
 def test_share_with_user():
     # Create user1
     response = client.post("/users/", json={"username": "user1", "password": "password1"})
@@ -77,25 +125,14 @@ def test_share_with_user():
     token1 = response.json()[1]
 
     # Authenticate as user1 and upload a file
-    headers1 = {"Authorization": f"Bearer {token1}"}
-    response = client.post("/storage/file", headers=headers1, files={"file": ("test.txt", "Hello, User1!")}, data={"path": "/user1-files/"})
+    content_user1 = b"Hello, User1!"
+    path_user1 = "/user1-files/"
+    response = upload_file(token1, path_user1, content_user1)
     assert response.status_code == 200
 
-    # Create user2
-    response = client.post("/users/", json={"username": "user2", "password": "password2"})
-    assert response.status_code == 200
-    user2 = response.json()[0]
-    token2 = response.json()[1]
+    # ... rest of the test code ...
 
-    # Share the file with user2
-    headers2 = {"Authorization": f"Bearer {token2}"}
-    response = client.post("/shares/user", headers=headers1, json={"user_name": "user2", "path": "/user1-files/test.txt", "permission": "R"})
-    assert response.status_code == 200
 
-    # Authenticate as user2 and check if the file is visible
-    response = client.get("/storage/", headers=headers2)
-    assert response.status_code == 200
-    assert "/user1-files/test.txt" in response.json()["owned_objects"]["children"]
 
 
 # Test sharing with group

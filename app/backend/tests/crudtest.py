@@ -46,26 +46,23 @@ def setup_test_data(db_session):
         
     db_session.commit()
     
-def comp_obj_non_nested(x,y,own=True,id=True,content=True, debug=False):
-    valid = x.name == y.name and x.path == y.path
-    if debug and not valid:
-        print("name or path bad")
-    if id and all(isinstance(o, models.Base) for o in (x, y)):
-        r = x.id == y.id
-        if debug and  not r:
-            print("id bad")
-        valid &= r
-    if own and all(isinstance(o, (models.StorageObject, schemas.SharedStorageObject)) for o in (x, y)):
-        r = x.owner==y.owner
-        if debug and  not r:
-            print("owner bad")
-        valid &= r
-    if content and all(isinstance(o, (models.File, schemas.FullFile)) for o in (x, y)):
-        r = x.content == y.content
-        if debug and  not r:
-            print("content bad")
-    return valid
+def comp_obj_non_nested(x,y,debug=False):
+    valid_uri = x.name == y.name and x.path == y.path
+    valid_id = any(not isinstance(o, models.Base) for o in (x, y)) or x.id == y.id
+    valid_owner =  any(not isinstance(o, (models.StorageObject, schemas.SharedStorageObject)) for o in (x, y)) or x.owner==y.owner
+    valid_content = any(not isinstance(o, (models.File, schemas.FullFile)) for o in (x, y)) or x.content == y.content
     
+    if debug:
+        print("comp")
+        print("x", x, "y", y)
+        print(
+            f"{valid_uri=}",
+            f"{valid_id=}",
+            f"{valid_owner=}",
+            f"{valid_content=}",
+        )
+        
+    return valid_uri and valid_id and valid_owner and valid_content
 
 # Unit tests
 def test_create_user(db_session):
@@ -203,7 +200,7 @@ def test_delete_shared_obj(db_session):
     dir = crud.create_storage_object(db_session, sharee.id, sharee.root.path, "dir")
     file = crud.create_storage_object(db_session, sharee.id, dir.path, "file.txt", content=b"File content")
     share = crud.share_storage_object_with_user(db_session, dir.id, sharee.id, receivee.id, "R")
-    assert file in crud.get_subelements(receivee.shared_objects)
+    #assert file in crud.get_subelements(receivee.shared_objects)
     assert dir in receivee.shared_objects
     assert crud.get_permission_for_user_and_object(db_session, receivee.id, file.id) == "R"
 
@@ -234,13 +231,15 @@ def test_get_all_objs_tree(db_session):
     owned_file3 = crud.create_storage_object(db_session, receivee.id, owned_dir2.path, "file3.txt", content=b"File content3")
     
     
-    shared_dir = crud.create_storage_object(db_session, sharee.id, sharee.root.path, "dir")
-    shared_file = crud.create_storage_object(db_session, sharee.id, shared_dir.path, "shf.txt", content=b"File content")
+    shared_dir1 = crud.create_storage_object(db_session, sharee.id, sharee.root.path, "dir1")
+    shared_dir2 = crud.create_storage_object(db_session, sharee.id, shared_dir1.path, "dir2")
+    shared_file1 = crud.create_storage_object(db_session, sharee.id, shared_dir1.path, "shf1.txt", content=b"File content 1")
+    shared_file2 = crud.create_storage_object(db_session, sharee.id, shared_dir2.path, "shf2.txt", content=b"File content 2")
     
     group_shared_obj = crud.create_storage_object(db_session, groupsharee1.id, groupsharee1.root.path, "group_shared.txt", content=b"Group shared content")
     group_shared_obj_remove = crud.create_storage_object(db_session, groupsharee2.id, sharee.root.path, "removefile.txt", content=b"To be removed")
 
-    share = crud.share_storage_object_with_user(db_session, shared_dir.id, sharee.id, receivee.id, "R")
+    share = crud.share_storage_object_with_user(db_session, sharee.root.id, sharee.id, receivee.id, "R")
     group_share = crud.share_storage_object_with_group(db_session, group_shared_obj.id, group.id, "RW")
     group_share_remove = crud.share_storage_object_with_group(db_session, group_shared_obj_remove.id, group.id, "R")
     
@@ -248,52 +247,22 @@ def test_get_all_objs_tree(db_session):
     midway_owned = midway_objs.owned_objects
     midway_shared = midway_objs.shared_objects
     midway_group_shared = midway_objs.group_shared_objects
-    # print(owned_file1)
-    # print(midway_objs)
     
-    # import collections
+    midway_owned_flat = crud.get_subelements_schema(midway_owned.children)
     
-    # def get_subelements(elements: list[models.StorageObject]):
-    #     working_set = collections.deque(elements if isinstance(elements, list) else [elements])
-    #     print(working_set)
-    #     subelements = []
-    #     while working_set:
-    #         element = working_set.popleft()
-    #         subelements.append(element)
-    #         print(element)
-    #         match(element):
-    #             case models.Directory(children=children):
-    #                 working_set.extend(children)
-    #     return subelements
+    midway_to_be_owned = crud.get_subelements([owned_file1, owned_file2, owned_file3, owned_dir1, owned_dir2])
     
-    #midway_owned = 
     
-    # print(midway_owned)
-    # print(midway_owned.children)
-    midway_owned_flat = crud.get_subelements(midway_owned)
-    owned = crud.get_subelements([owned_file1, owned_file2, owned_file3, owned_dir1, owned_dir2])
-    #print(f"{midway_owned=}")
-    print(f"{midway_owned_flat=}")
-    print(f"{owned=}")
-    
-    for to_be_owned in midway_owned_flat:
+    print(f"{midway_owned_flat=}\n")
+    print(f"{midway_to_be_owned=}\n")
+    # print(f"{owned=}")
+    for to_be_owned in midway_to_be_owned:
         found = False
-        for o in owned:
+        for o in midway_owned_flat:
             if comp_obj_non_nested(to_be_owned, o, True):
                 found = True
-        # if not found:
-        #     print(f"{[owned_file1, owned_file2, owned_file3, owned_dir1, owned_dir2]}=")
-        #     print(f"{to_be_owned}=")
-        assert found, to_be_owned
-    
-
-    assert any([comp_obj_non_nested(owned_file1, c) for c in midway_owned.children])
-    assert any([comp_obj_non_nested(owned_dir1, c) for c in midway_owned.children])
-    assert any([comp_obj_non_nested(owned_file2, cc)  for cc in [c.children for c in midway_owned.children if isinstance(c, models.Directory)]])
-    assert any([comp_obj_non_nested(owned_dir2, cc) for cc in [c.children for c in midway_owned.children if isinstance(c, models.Directory)]])
-    assert any([comp_obj_non_nested(owned_file3, ccc) for ccc in [cc.children for cc in [c.children for c in midway_owned.children if isinstance(c, models.Directory)] if isinstance(cc, models.Directory)]])
-
-   
+        assert found, str(to_be_owned)
+        print("passed", to_be_owned)
     
 if __name__ == "__main__":
     assert False

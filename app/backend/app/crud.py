@@ -143,14 +143,14 @@ def create_storage_object(
     if path[-1] == "/":
         path = path[:-1]
     
-    owner: models.User = get_user(db, user_id)
+    owner = get_user(db, user_id)
     
     obj_path = f"{path}/{object_name}"
     
     old_in_db = get_storageobject_by_path(db, user_id, obj_path)
     
     if old_in_db:
-        raise DuplicateError(f"Object {schemas.File.model_validate(old_in_db)} already exists")
+        raise DuplicateError(f"Object {schemas.OwnedFile.model_validate(old_in_db)} already exists")
     
     # logger.debug(f"{old_in_db} doesnt exist yet")
 
@@ -343,7 +343,10 @@ def get_subelements(elements: list[models.StorageObject]):
         subelements.append(element)
         match(element):
             case models.Directory(children=children):
+                print("type1", models.Directory)
                 working_set.extend(children)
+            case _:
+                print("type2", type(element))
     return subelements
 
 
@@ -354,8 +357,11 @@ def get_subelements_schema(elements: list[schemas.SharedStorageObject]):
         element = working_set.popleft()
         subelements.append(element)
         match(element):
-            case schemas.Directory(children=children):
+            case schemas.OwnedDirectory(children=children) | schemas.SharedDirectory(children=children):
+                print("type1", type(element), "element", element)
                 working_set.extend(children)
+            case _:
+                print("type2", type(element), "element", element)
     return subelements
 
 
@@ -460,8 +466,6 @@ def change_user_quota(db: Session, user_id: int, new_quota: int) -> models.User:
 
 def build_tree(db: Session, user_id: int, root: models.StorageObject):
     permission = get_permission_for_user_and_object(db, user_id, root.id)
-    owner = owner=root.owner
-    
     base_dict = dict(owner=root.owner, permission=permission)
     
     root_dict = root.to_dict()
@@ -478,7 +482,6 @@ def build_tree(db: Session, user_id: int, root: models.StorageObject):
    
     working_set = collections.deque(itertools.product(root_children, [tree]))
     
-    # logger.debug(f"{working_set}")
     
     def _update(parent: schemas.SharedDirectory, children: list[models.StorageObject]):
         if not children:
@@ -504,79 +507,16 @@ def build_tree(db: Session, user_id: int, root: models.StorageObject):
     
     while working_set:
         current, parent = working_set.popleft()
-        build_args = dict(**current.to_dict(), owner=owner, permission=permission)# children=[])
+        build_args = dict(**current.to_dict(), **base_dict)# children=[])
+        print("build args", build_args)
         if isinstance(current, models.File):
             new_node = schemas.SharedFile.model_validate(build_args)
         else:
             new_node = schemas.SharedDirectory.model_validate(build_args)
             _update(new_node, current.children)
         parent.children.append(new_node)
-        
-        # while working_set:
-        #     current, parent = working_set.popleft()
-        #     new_node = schemas.Directory(**current.to_dict(), permission=permission)
-        #     parent.children.append(new_node)
-        #     _update(new_node)
-
     
     return tree
-
- # root_dict["children"] = None
-    
-    # logger.debug(f"{children=}")
-    # logger.debug(f"{root_dict=}")
-    # tree = schemas.Directory(**root_dict, permission=permission)
-    # logger.debug(f"{tree=}")
-    
-      # tree = schemas.Directory.model_validate(
-    #     root#**root.to_dict(), permission=permission,
-    # )
-
-
-"""
-def build_tree(db: Session, user_id: int, root: models.Directory):
-    # seems this is equivalent to calling models.Directory.model_validate lmfao
-    permission = get_permission_for_user_and_object(db, user_id, root.id)
-    
-    tree = schemas.Directory.model_validate(
-        root#**root.to_dict(), permission=permission,
-    )
-
-    if not root.children:
-        return tree
-   
-    working_set = collections.deque()
-    
-    def _update(parent: models.Directory):
-        children: list[models.StorageObject] = parent.children
-        if not children:
-            return
-        files = [
-            schemas.FileSummary(
-                **c.to_dict(), permission=permission
-            )
-            for c in children
-            if isinstance(c, models.File)
-        ]
-        directories = [
-            c for c in children
-            if isinstance(c, models.Directory)
-        ]
-        parent.children.extend(files)
-        if directories:
-            working_set.extend(itertools.product(directories, [parent]))
-    
-    _update(tree)
-    
-    current: models.Directory = None
-    parent: schemas.Directory = None
-    
-    while working_set:
-        current, parent = working_set.popleft()
-        new_node = schemas.Directory(**current.to_dict(), permission=permission)
-        parent.children.append(new_node)
-        _update(new_node)
-"""
 
 
 def init_admin(db: Session):
